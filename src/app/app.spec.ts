@@ -1,18 +1,38 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { Router, provideRouter } from '@angular/router';
 import { App } from './app';
 import { AuthService } from './core/auth/auth.service';
 
 describe('App', () => {
+  let http: HttpTestingController;
+
   beforeEach(async () => {
     localStorage.clear();
+    TestBed.resetTestingModule();
     await TestBed.configureTestingModule({
       imports: [App],
       providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
     }).compileComponents();
+    http = TestBed.inject(HttpTestingController);
   });
+
+  afterEach(() => localStorage.clear());
+
+  /** Logs in through the real flow (the token lives in memory only) and renders the app. */
+  const loggedInApp = (role: 'ADMIN' | 'CUSTOMER'): ComponentFixture<App> => {
+    const fixture = TestBed.createComponent(App);
+    TestBed.inject(AuthService).login({ email: 'a@b.c', password: 'S3curepass12' }).subscribe();
+    http.expectOne('/api/auth/login').flush({ accessToken: 'tok', tokenType: 'Bearer', expiresIn: 900 });
+    http.expectOne('/api/me').flush({
+      id: 'u', firstName: 'A', lastName: 'B', email: 'a@b.c', role, createdAt: '2026-10-01T00:00:00Z',
+    });
+    fixture.detectChanges();
+    return fixture;
+  };
+  const buttonLabelled = (fixture: ComponentFixture<App>, text: string) =>
+    [...(fixture.nativeElement as HTMLElement).querySelectorAll('button')].find((b) => b.textContent?.trim() === text)!;
 
   it('shows the brand but no logout button for guests', async () => {
     const fixture = TestBed.createComponent(App);
@@ -23,29 +43,53 @@ describe('App', () => {
     expect(el.querySelector('button')).toBeNull();
   });
 
-  describe('Admin menu link', () => {
-    const navFor = async (role: 'ADMIN' | 'CUSTOMER') => {
-      localStorage.setItem('neobank.accessToken', 'tok');
-      TestBed.resetTestingModule();
-      await TestBed.configureTestingModule({
-        imports: [App],
-        providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
-      }).compileComponents();
-      const fixture = TestBed.createComponent(App);
-      TestBed.inject(AuthService).loadUser().subscribe();
-      TestBed.inject(HttpTestingController).expectOne('/api/me').flush({
-        id: 'u', firstName: 'A', lastName: 'B', email: 'a@b.c', role, createdAt: '2026-10-01T00:00:00Z',
-      });
-      fixture.detectChanges();
-      return (fixture.nativeElement as HTMLElement).querySelector('nav')?.textContent ?? '';
-    };
+  it('shows the Admin menu link to administrators only', () => {
+    const admin = loggedInApp('ADMIN');
+    expect((admin.nativeElement as HTMLElement).querySelector('nav')?.textContent).toContain('Admin');
 
-    afterEach(() => localStorage.clear());
-
-    it('is shown to administrators only', async () => {
-      expect(await navFor('ADMIN')).toContain('Admin');
-      expect(await navFor('CUSTOMER')).not.toContain('Admin');
-      expect(await navFor('CUSTOMER')).toContain('Recurring'); // the rest of the menu is unchanged
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [App],
+      providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
     });
+    http = TestBed.inject(HttpTestingController);
+    const customer = loggedInApp('CUSTOMER');
+    const nav = (customer.nativeElement as HTMLElement).querySelector('nav')?.textContent ?? '';
+    expect(nav).not.toContain('Admin');
+    expect(nav).toContain('Recurring'); // the rest of the menu is unchanged
+  });
+
+  it('Log out ends the session here, tells the server, and goes to the login page', () => {
+    const fixture = loggedInApp('CUSTOMER');
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+
+    buttonLabelled(fixture, 'Log out').click();
+
+    http.expectOne('/api/auth/logout').flush(null, { status: 204, statusText: 'No Content' });
+    expect(TestBed.inject(AuthService).isLoggedIn()).toBe(false);
+    expect(navigate).toHaveBeenCalledWith(['/login']);
+  });
+
+  it('Log out everywhere asks the server to end every session before leaving', () => {
+    const fixture = loggedInApp('CUSTOMER');
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+
+    buttonLabelled(fixture, 'Log out everywhere').click();
+    expect(navigate).not.toHaveBeenCalled(); // not until the server confirmed
+
+    http.expectOne('/api/auth/logout-all').flush(null, { status: 204, statusText: 'No Content' });
+    expect(TestBed.inject(AuthService).isLoggedIn()).toBe(false);
+    expect(navigate).toHaveBeenCalledWith(['/login']);
+  });
+
+  it('stays logged in when "log out everywhere" fails, instead of pretending it worked', () => {
+    const fixture = loggedInApp('CUSTOMER');
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+
+    buttonLabelled(fixture, 'Log out everywhere').click();
+    http.expectOne('/api/auth/logout-all').flush({}, { status: 500, statusText: 'Server Error' });
+
+    expect(TestBed.inject(AuthService).isLoggedIn()).toBe(true);
+    expect(navigate).not.toHaveBeenCalled();
   });
 });

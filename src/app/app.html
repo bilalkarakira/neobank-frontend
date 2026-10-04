@@ -22,6 +22,8 @@
         @if (auth.user(); as u) {
           <span class="hidden text-slate-300 sm:inline">{{ u.firstName }} {{ u.lastName }}</span>
         }
+        <button type="button" class="btn-ghost hidden whitespace-nowrap text-slate-400 lg:inline-flex"
+          title="Ends your session on every device" (click)="logoutEverywhere()">Log out everywhere</button>
         <button type="button" class="btn-ghost whitespace-nowrap" (click)="logout()">Log out</button>
       </div>
     }

@@ -15,4 +15,12 @@ export class App {
     this.auth.logout();
     void this.router.navigate(['/login']);
   }
+
+  /** If the request fails the user stays logged in, so nothing is hidden behind a false "you are logged out". */
+  protected logoutEverywhere(): void {
+    this.auth.logoutAll().subscribe({
+      next: () => void this.router.navigate(['/login']),
+      error: () => undefined,
+    });
+  }
 }
