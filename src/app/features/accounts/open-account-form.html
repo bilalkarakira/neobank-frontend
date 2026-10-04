@@ -1,0 +1,39 @@
+<form [formGroup]="form" (ngSubmit)="submit()" class="card space-y-4" novalidate>
+  <h3 class="text-base font-semibold">Open a new account</h3>
+
+  @if (error(); as message) {
+    <p class="alert-error" role="alert">{{ message }}</p>
+  }
+
+  <fieldset>
+    <legend class="label">Account type</legend>
+    <div class="grid grid-cols-2 gap-3">
+      @for (t of types; track t.value) {
+        <label
+          class="cursor-pointer rounded-lg border p-3 text-sm transition has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-50"
+          [class.border-slate-300]="form.controls.type.value !== t.value"
+        >
+          <input type="radio" class="sr-only" formControlName="type" [value]="t.value" />
+          <span class="block font-medium">{{ t.label }}</span>
+          <span class="block text-xs text-slate-500">{{ t.hint }}</span>
+        </label>
+      }
+    </div>
+  </fieldset>
+
+  <div>
+    <label class="label" for="nickname">Nickname <span class="font-normal text-slate-400">(optional)</span></label>
+    <input id="nickname" class="input" formControlName="nickname" maxlength="40" placeholder="e.g. Holiday fund"
+      [class.input-invalid]="form.controls.nickname.invalid" />
+  </div>
+
+  <div class="flex gap-3">
+    <button type="submit" class="btn-primary" [disabled]="form.invalid || submitting()">
+      {{ submitting() ? 'Opening…' : 'Open account' }}
+    </button>
+    <button type="button" class="rounded-lg px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100"
+      (click)="cancelled.emit()">
+      Cancel
+    </button>
+  </div>
+</form>

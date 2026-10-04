@@ -1,0 +1,63 @@
+<section aria-labelledby="accounts-heading">
+  <div class="mb-4 flex items-center justify-between">
+    <h2 id="accounts-heading" class="text-lg font-semibold">Your accounts</h2>
+    @if (!showForm()) {
+      <button type="button" class="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-indigo-500"
+        (click)="showForm.set(true)">
+        Open account
+      </button>
+    }
+  </div>
+
+  @if (showForm()) {
+    <div class="mb-6">
+      <app-open-account-form (opened)="onOpened($event)" (cancelled)="showForm.set(false)" />
+    </div>
+  }
+
+  @if (loadFailed()) {
+    <p class="alert-error" role="alert">
+      Could not load your accounts.
+      <button type="button" class="font-medium underline" (click)="load()">Try again</button>
+    </p>
+  } @else if (accounts(); as list) {
+    @if (list.length === 0) {
+      <div class="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
+        <p class="font-medium">You have no accounts yet</p>
+        <p class="mt-1 text-sm text-slate-500">Open your first account to get started.</p>
+      </div>
+    } @else {
+      <ul class="grid gap-4 sm:grid-cols-2">
+        @for (account of list; track account.id) {
+          <li class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div class="flex items-start justify-between">
+              <div>
+                <p class="font-semibold">{{ title(account) }}</p>
+                <p class="text-xs uppercase tracking-wide text-slate-400">{{ account.type }}</p>
+              </div>
+              @if (account.status !== 'ACTIVE') {
+                <span class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                  {{ account.status }}
+                </span>
+              }
+            </div>
+
+            <p class="mt-4 text-2xl font-bold tabular-nums">
+              {{ amount(account) | currency: account.currency }}
+            </p>
+
+            <div class="mt-4 flex items-center justify-between gap-2 text-xs text-slate-500">
+              <span class="font-mono">{{ formatIban(account.iban) }}</span>
+              <button type="button" class="rounded px-2 py-1 font-medium text-indigo-600 hover:bg-indigo-50"
+                (click)="copy(account)">
+                {{ copiedId() === account.id ? 'Copied' : 'Copy' }}
+              </button>
+            </div>
+          </li>
+        }
+      </ul>
+    }
+  } @else {
+    <p class="text-sm text-slate-500">Loading your accounts…</p>
+  }
+</section>
