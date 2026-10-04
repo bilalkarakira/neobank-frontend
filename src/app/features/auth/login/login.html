@@ -1,0 +1,47 @@
+<div class="mx-auto mt-16 w-full max-w-md px-4">
+  <div class="card">
+    <h1 class="text-2xl font-bold">Welcome back</h1>
+    <p class="mt-1 text-sm text-slate-500">Log in to your NeoBank account.</p>
+
+    <div class="mt-5 space-y-3">
+      @if (justRegistered) {
+        <p class="alert-success" role="status">Account created. Please log in.</p>
+      }
+      @if (sessionExpired) {
+        <p class="alert-error" role="alert">Your session has expired. Please log in again.</p>
+      }
+      @if (error(); as message) {
+        <p class="alert-error" role="alert">{{ message }}</p>
+      }
+    </div>
+
+    <form [formGroup]="form" (ngSubmit)="submit()" class="mt-5 space-y-4" novalidate>
+      <div>
+        <label class="label" for="email">Email</label>
+        <input id="email" type="email" class="input" formControlName="email" autocomplete="email"
+          [class.input-invalid]="form.controls.email.touched && form.controls.email.invalid" />
+        @if (form.controls.email.touched && form.controls.email.invalid) {
+          <p class="field-error">Enter a valid email address.</p>
+        }
+      </div>
+
+      <div>
+        <label class="label" for="password">Password</label>
+        <input id="password" type="password" class="input" formControlName="password" autocomplete="current-password"
+          [class.input-invalid]="form.controls.password.touched && form.controls.password.invalid" />
+        @if (form.controls.password.touched && form.controls.password.invalid) {
+          <p class="field-error">Password is required.</p>
+        }
+      </div>
+
+      <button type="submit" class="btn-primary" [disabled]="form.invalid || submitting()">
+        {{ submitting() ? 'Logging in…' : 'Log in' }}
+      </button>
+    </form>
+
+    <p class="mt-6 text-center text-sm text-slate-500">
+      New to NeoBank?
+      <a routerLink="/register" class="font-medium text-indigo-600 hover:underline">Create an account</a>
+    </p>
+  </div>
+</div>

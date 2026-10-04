@@ -1,0 +1,62 @@
+<div class="mx-auto mt-12 w-full max-w-md px-4 pb-12">
+  <div class="card">
+    <h1 class="text-2xl font-bold">Create your account</h1>
+    <p class="mt-1 text-sm text-slate-500">It takes a minute. No real money involved.</p>
+
+    @if (error(); as message) {
+      <p class="alert-error mt-5" role="alert">{{ message }}</p>
+    }
+
+    <form [formGroup]="form" (ngSubmit)="submit()" class="mt-5 space-y-4" novalidate>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="label" for="firstName">First name</label>
+          <input id="firstName" class="input" formControlName="firstName" autocomplete="given-name"
+            [class.input-invalid]="showError(form.controls.firstName)" />
+          @if (showError(form.controls.firstName)) {
+            <p class="field-error">{{ serverMessage(form.controls.firstName) ?? 'First name is required.' }}</p>
+          }
+        </div>
+        <div>
+          <label class="label" for="lastName">Last name</label>
+          <input id="lastName" class="input" formControlName="lastName" autocomplete="family-name"
+            [class.input-invalid]="showError(form.controls.lastName)" />
+          @if (showError(form.controls.lastName)) {
+            <p class="field-error">{{ serverMessage(form.controls.lastName) ?? 'Last name is required.' }}</p>
+          }
+        </div>
+      </div>
+
+      <div>
+        <label class="label" for="email">Email</label>
+        <input id="email" type="email" class="input" formControlName="email" autocomplete="email"
+          [class.input-invalid]="showError(form.controls.email)" />
+        @if (showError(form.controls.email)) {
+          <p class="field-error">{{ serverMessage(form.controls.email) ?? 'Enter a valid email address.' }}</p>
+        }
+      </div>
+
+      <div>
+        <label class="label" for="password">Password</label>
+        <input id="password" type="password" class="input" formControlName="password" autocomplete="new-password"
+          [class.input-invalid]="showError(form.controls.password)" />
+        @if (showError(form.controls.password)) {
+          <p class="field-error">
+            {{ serverMessage(form.controls.password) ?? 'Use 10-72 characters with at least one letter and one digit.' }}
+          </p>
+        } @else {
+          <p class="mt-1 text-xs text-slate-400">10-72 characters, at least one letter and one digit.</p>
+        }
+      </div>
+
+      <button type="submit" class="btn-primary" [disabled]="form.invalid || submitting()">
+        {{ submitting() ? 'Creating account…' : 'Create account' }}
+      </button>
+    </form>
+
+    <p class="mt-6 text-center text-sm text-slate-500">
+      Already have an account?
+      <a routerLink="/login" class="font-medium text-indigo-600 hover:underline">Log in</a>
+    </p>
+  </div>
+</div>
