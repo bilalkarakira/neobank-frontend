@@ -29,6 +29,11 @@ export const routes: Routes = [
     loadComponent: () => import('./features/transfer/transfer').then((m) => m.Transfer),
   },
   {
+    path: 'recurring',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/recurring/recurring').then((m) => m.Recurring),
+  },
+  {
     path: 'history',
     canActivate: [authGuard],
     loadComponent: () => import('./features/history/history').then((m) => m.History),
