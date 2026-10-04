@@ -7,6 +7,7 @@ import { RouterLink } from '@angular/router';
 import { Observable, catchError, debounceTime, distinctUntilChanged, map, of, startWith, switchMap } from 'rxjs';
 import { amountValidator, normalizeAmount } from '../../core/amount';
 import { ApiProblem } from '../../core/auth/auth.models';
+import { tooManyMessage } from '../../core/rate-limit';
 import { accountTitle } from '../accounts/account-title';
 import { Account } from '../accounts/accounts.models';
 import { AccountsService } from '../accounts/accounts.service';
@@ -95,6 +96,7 @@ export class Recurring {
           catchError((err: unknown): Observable<RecipientState> => {
             const status = err instanceof HttpErrorResponse ? err.status : 0;
             const code = err instanceof HttpErrorResponse ? (err.error as ApiProblem | null)?.code : undefined;
+            if (status === 429) return of({ status: 'rate-limited', message: tooManyMessage(err) });
             if (status === 404) return of({ status: 'not-found' });
             if (status === 422 && code === 'RECIPIENT_UNAVAILABLE') return of({ status: 'unavailable' });
             if (status === 400) return of({ status: 'invalid' });
@@ -371,6 +373,9 @@ export class Recurring {
           const first = Object.entries(problem.fields ?? {})[0];
           return first ? `${first[0]} ${first[1]}` : 'Please check the details and try again.';
         }
+      }
+      if (err.status === 429) {
+        return tooManyMessage(err);
       }
       if (err.status >= 400 && err.status < 500) {
         return 'The request was rejected. Please check the details and try again.';

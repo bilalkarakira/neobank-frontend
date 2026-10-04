@@ -3,6 +3,7 @@ import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../../core/auth/auth.service';
+import { isRateLimited, tooManyMessage } from '../../../core/rate-limit';
 
 @Component({
   selector: 'app-login',
@@ -40,7 +41,11 @@ export class Login {
       error: (err: unknown) => {
         this.submitting.set(false);
         const unauthorized = err instanceof HttpErrorResponse && err.status === 401;
-        this.error.set(unauthorized ? 'Invalid email or password.' : 'Something went wrong. Please try again.');
+        if (isRateLimited(err)) {
+          this.error.set(tooManyMessage(err));
+        } else {
+          this.error.set(unauthorized ? 'Invalid email or password.' : 'Something went wrong. Please try again.');
+        }
       },
     });
   }

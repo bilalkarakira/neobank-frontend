@@ -2,6 +2,7 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { Observable, catchError, finalize, map, of, shareReplay, switchMap, tap, throwError, timer } from 'rxjs';
 import { LoginRequest, RegisterRequest, TokenResponse, User } from './auth.models';
+import { isRateLimited } from '../rate-limit';
 import { SessionHint } from './session-hint';
 
 /** Sent on the cookie-authenticated endpoints: a cross-site form or image cannot add a custom header. */
@@ -84,6 +85,10 @@ export class AuthService {
         this.hint.set();
       }),
       catchError((err: unknown) => {
+        if (isRateLimited(err)) {
+          // our own limit, not a verdict on the session: leave everything as it is so a later try can succeed
+          return throwError(() => err);
+        }
         this.tokenSignal.set(null);
         if (isUnauthorized(err)) {
           this.hint.clear(); // the server dropped the cookie: no point trying again on the next page load

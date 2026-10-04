@@ -61,6 +61,23 @@ describe('Register', () => {
     expect(el.textContent).toContain('This email is already registered.');
   });
 
+  it('says how long to wait when too many accounts were created from this network', () => {
+    const fixture = render();
+    const el = fixture.nativeElement as HTMLElement;
+    fill(el, VALID);
+    fixture.detectChanges();
+
+    el.querySelector('form')!.dispatchEvent(new Event('submit'));
+    controller.expectOne('/api/auth/register').flush(
+      { code: 'RATE_LIMITED' },
+      { status: 429, statusText: 'Too Many Requests', headers: { 'Retry-After': '3600' } },
+    );
+    fixture.detectChanges();
+
+    expect(el.textContent).toContain('Too many attempts. Please try again in about 1 hour.');
+    expect(el.textContent).not.toContain('Something went wrong');
+  });
+
   it('redirects to login with the registered flag on success', () => {
     const fixture = render();
     const el = fixture.nativeElement as HTMLElement;

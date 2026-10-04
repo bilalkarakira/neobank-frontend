@@ -42,4 +42,6 @@ export type RecipientState =
   | { status: 'invalid' }
   | { status: 'not-found' }
   | { status: 'unavailable' }
+  /** Too many lookups, or too many unknown IBANs: the server asks the user to wait. */
+  | { status: 'rate-limited'; message: string }
   | { status: 'error' };

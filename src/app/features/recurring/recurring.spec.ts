@@ -292,6 +292,39 @@ describe('Recurring page', () => {
     expect(button('Create recurring payment')).toBeTruthy(); // the form stays open so nothing is lost
   });
 
+  it('tells the user how long to wait when the recipient lookup is rate-limited', () => {
+    loadData([]);
+    click('New recurring payment');
+    set('iban', OTHER_IBAN);
+    vi.advanceTimersByTime(400);
+    http.expectOne((r) => r.url === '/api/recipients/lookup').flush(
+      { code: 'RATE_LIMITED' },
+      { status: 429, statusText: 'Too Many Requests', headers: { 'Retry-After': '120' } },
+    );
+    fixture.detectChanges();
+
+    expect(el.textContent).toContain('Too many attempts. Please try again in about 2 minutes.');
+    set('amount', '10');
+    expect(button('Create recurring payment').disabled).toBe(true); // no confirmed recipient
+  });
+
+  it('shows the wait when creating is rate-limited, and keeps the form open', () => {
+    loadData([]);
+    click('New recurring payment');
+    click('My accounts');
+    set('toOwnId', 'b');
+    set('amount', '10');
+    click('Create recurring payment');
+    http.expectOne('/api/recurring-payments').flush(
+      { code: 'RATE_LIMITED' },
+      { status: 429, statusText: 'Too Many Requests', headers: { 'Retry-After': '30' } },
+    );
+    fixture.detectChanges();
+
+    expect(el.textContent).toContain('Too many attempts. Please try again in about 30 seconds.');
+    expect(button('Create recurring payment')).toBeTruthy();
+  });
+
   it('offers a retry when loading fails', () => {
     http.expectOne('/api/recurring-payments').flush(null, { status: 500, statusText: 'Server Error' });
     http.expectOne('/api/accounts').flush([CHECKING]);

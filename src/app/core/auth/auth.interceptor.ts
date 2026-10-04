@@ -2,6 +2,7 @@ import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { catchError, switchMap, throwError } from 'rxjs';
+import { isRateLimited } from '../rate-limit';
 import { AuthService } from './auth.service';
 
 /** These never carry the bearer token, and a 401 from them is not "the session expired". */
@@ -40,8 +41,11 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
         return throwError(() => error);
       }
       return auth.refresh().pipe(
-        catchError(() => {
-          endSession();
+        catchError((refreshError: unknown) => {
+          // a rate-limited refresh says nothing about the session: do not log the user out for it
+          if (!isRateLimited(refreshError)) {
+            endSession();
+          }
           return throwError(() => error);
         }),
         switchMap((token) =>

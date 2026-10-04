@@ -4,6 +4,7 @@ import { AbstractControl, FormBuilder, ReactiveFormsModule, Validators } from '@
 import { Router, RouterLink } from '@angular/router';
 import { ApiProblem } from '../../../core/auth/auth.models';
 import { AuthService } from '../../../core/auth/auth.service';
+import { isRateLimited, tooManyMessage } from '../../../core/rate-limit';
 
 @Component({
   selector: 'app-register',
@@ -63,7 +64,9 @@ export class Register {
     }
     const problem = err.error as ApiProblem | null;
 
-    if (err.status === 409 && problem?.code === 'EMAIL_ALREADY_REGISTERED') {
+    if (isRateLimited(err)) {
+      this.error.set(tooManyMessage(err));
+    } else if (err.status === 409 && problem?.code === 'EMAIL_ALREADY_REGISTERED') {
       this.setServerError('email', 'This email is already registered.');
     } else if (err.status === 400 && problem?.fields) {
       for (const [field, message] of Object.entries(problem.fields)) {

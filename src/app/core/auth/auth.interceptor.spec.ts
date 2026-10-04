@@ -122,6 +122,20 @@ describe('authInterceptor', () => {
     expect((error as { status: number }).status).toBe(401); // the caller still sees what went wrong
   });
 
+  it('a refresh that is merely rate-limited does not log the user out: the caller just sees the failure', () => {
+    logIn('old');
+    let error: { status: number } | undefined;
+    http.get('/api/accounts').subscribe({ error: (e) => (error = e) });
+
+    controller.expectOne('/api/accounts').flush({}, UNAUTHORIZED);
+    controller.expectOne('/api/auth/refresh').flush({ code: 'RATE_LIMITED' }, { status: 429, statusText: 'Too Many Requests' });
+
+    expect(error?.status).toBe(401);
+    expect(auth.isLoggedIn()).toBe(true);
+    expect(navigate).not.toHaveBeenCalled();
+    controller.expectNone('/api/auth/logout');
+  });
+
   it('a call that is still rejected after a fresh token ends the session, and never loops', () => {
     logIn('old');
     http.get('/api/admin/overview').subscribe({ error: () => undefined });

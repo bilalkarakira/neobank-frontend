@@ -303,4 +303,42 @@ describe('Transfer page', () => {
     loadData([CHECKING]);
     expect(el.textContent).toContain('You need another active account');
   });
+
+  it('tells the user how long to wait when recipient lookups are rate-limited, and blocks the review', () => {
+    loadData();
+    button('Someone else').click();
+    fixture.detectChanges();
+    set('amount', '10');
+
+    set('iban', OTHER_IBAN);
+    settle();
+    http.expectOne((r) => r.url === '/api/recipients/lookup').flush(
+      { code: 'RATE_LIMITED', retryAfterSeconds: 600 },
+      { status: 429, statusText: 'Too Many Requests', headers: { 'Retry-After': '600' } },
+    );
+    fixture.detectChanges();
+
+    expect(el.textContent).toContain('Too many attempts. Please try again in about 10 minutes.');
+    expect(el.textContent).not.toContain('No account was found');
+    expect(button('Review transfer').disabled).toBe(true);
+  });
+
+  it('shows the wait on the review step when the transfer itself is rate-limited, and allows another try', () => {
+    loadData();
+    set('toOwnId', 'b');
+    set('amount', '10');
+    button('Review transfer').click();
+    fixture.detectChanges();
+    button('Confirm transfer').click();
+
+    transferRequest().flush(
+      { code: 'RATE_LIMITED' },
+      { status: 429, statusText: 'Too Many Requests', headers: { 'Retry-After': '40' } },
+    );
+    fixture.detectChanges();
+
+    expect(el.textContent).toContain('Too many attempts. Please try again in about 40 seconds.');
+    expect(el.textContent).not.toContain('The transfer was rejected');
+    expect(button('Confirm transfer').disabled).toBe(false);
+  });
 });

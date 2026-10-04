@@ -170,6 +170,22 @@ describe('AuthService', () => {
     expect(localStorage.getItem(HINT)).toBe('1');
   });
 
+  it('a rate-limited refresh is not a verdict on the session: nothing is cleared and nothing is retried', () => {
+    const auth = setup();
+    logIn(auth, 'still-here');
+    let failed = false;
+
+    auth.refresh().subscribe({ error: () => (failed = true) });
+    http.expectOne('/api/auth/refresh').flush({ code: 'RATE_LIMITED' }, { status: 429, statusText: 'Too Many Requests' });
+    vi.advanceTimersByTime(REFRESH_RACE_RETRY_MS * 2);
+
+    expect(failed).toBe(true);
+    http.expectNone('/api/auth/refresh'); // 429 is not the 401 that triggers the cookie-race retry
+    expect(auth.token).toBe('still-here');
+    expect(auth.isLoggedIn()).toBe(true);
+    expect(localStorage.getItem(HINT)).toBe('1');
+  });
+
   // ---- restoring a session ----------------------------------------------------------------------------------
 
   it('restoreSession does nothing for a guest: no request, no console noise', () => {

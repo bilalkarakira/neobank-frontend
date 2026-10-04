@@ -94,6 +94,13 @@
                   @case ('invalid') { <p class="text-red-600">This IBAN doesn't look right. Please check it for typos.</p> }
                   @case ('not-found') { <p class="text-red-600">No account was found with this IBAN.</p> }
                   @case ('unavailable') { <p class="text-red-600">This account cannot receive money right now.</p> }
+                  @case ('rate-limited') {
+                    @if (recipient(); as state) {
+                      @if (state.status === 'rate-limited') {
+                        <p class="text-red-600" role="alert">{{ state.message }}</p>
+                      }
+                    }
+                  }
                   @case ('error') { <p class="text-red-600">We could not check this IBAN. Please try again.</p> }
                 }
               </div>
