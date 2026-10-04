@@ -1,5 +1,6 @@
 import { CurrencyPipe } from '@angular/common';
 import { Component, inject, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { accountTitle } from './account-title';
 import { Account, DepositResponse } from './accounts.models';
 import { AccountsService } from './accounts.service';
@@ -9,7 +10,7 @@ import { OpenAccountForm } from './open-account-form';
 
 @Component({
   selector: 'app-accounts',
-  imports: [CurrencyPipe, OpenAccountForm, DepositForm],
+  imports: [CurrencyPipe, OpenAccountForm, DepositForm, RouterLink],
   templateUrl: './accounts.html',
 })
 export class Accounts {

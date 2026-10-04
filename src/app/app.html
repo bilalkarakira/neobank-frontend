@@ -1,25 +1,23 @@
 <header class="bg-slate-900 text-white">
-  <div class="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
-    <div class="flex items-center gap-6">
-      <a routerLink="/" class="flex items-center gap-2 text-lg font-bold tracking-tight">
-        <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-500 text-sm">N</span>
-        NeoBank
-      </a>
-
-      @if (auth.isLoggedIn()) {
-        <nav class="flex items-center gap-1 text-sm" aria-label="Main">
-          <a routerLink="/home" routerLinkActive="bg-white/10 text-white" class="rounded-lg px-3 py-1.5 text-slate-300 hover:bg-white/10">Accounts</a>
-          <a routerLink="/transfer" routerLinkActive="bg-white/10 text-white" class="rounded-lg px-3 py-1.5 text-slate-300 hover:bg-white/10">Send money</a>
-        </nav>
-      }
-    </div>
+  <div class="mx-auto flex max-w-5xl flex-wrap items-center gap-x-6 gap-y-1 px-4 py-2 sm:h-14 sm:flex-nowrap sm:py-0">
+    <a routerLink="/" class="order-1 flex items-center gap-2 text-lg font-bold tracking-tight">
+      <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-500 text-sm">N</span>
+      NeoBank
+    </a>
 
     @if (auth.isLoggedIn()) {
-      <div class="flex items-center gap-3 text-sm">
+      <!-- on phones the navigation drops to its own row; from sm up it sits next to the brand -->
+      <nav class="order-3 flex w-full items-center gap-1 overflow-x-auto text-sm sm:order-2 sm:w-auto" aria-label="Main">
+        <a routerLink="/home" routerLinkActive="bg-white/10 text-white" class="whitespace-nowrap rounded-lg px-3 py-1.5 text-slate-300 hover:bg-white/10">Accounts</a>
+        <a routerLink="/transfer" routerLinkActive="bg-white/10 text-white" class="whitespace-nowrap rounded-lg px-3 py-1.5 text-slate-300 hover:bg-white/10">Send money</a>
+        <a routerLink="/history" routerLinkActive="bg-white/10 text-white" class="whitespace-nowrap rounded-lg px-3 py-1.5 text-slate-300 hover:bg-white/10">History</a>
+      </nav>
+
+      <div class="order-2 ml-auto flex items-center gap-3 text-sm sm:order-3">
         @if (auth.user(); as u) {
           <span class="hidden text-slate-300 sm:inline">{{ u.firstName }} {{ u.lastName }}</span>
         }
-        <button type="button" class="btn-ghost" (click)="logout()">Log out</button>
+        <button type="button" class="btn-ghost whitespace-nowrap" (click)="logout()">Log out</button>
       </div>
     }
   </div>

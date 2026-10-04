@@ -23,5 +23,10 @@ export const routes: Routes = [
     canActivate: [authGuard],
     loadComponent: () => import('./features/transfer/transfer').then((m) => m.Transfer),
   },
+  {
+    path: 'history',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/history/history').then((m) => m.History),
+  },
   { path: '**', redirectTo: 'home' },
 ];
