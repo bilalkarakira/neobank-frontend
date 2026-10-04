@@ -22,6 +22,8 @@ export class Accounts {
   protected readonly depositingId = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
   protected readonly copiedId = signal<string | null>(null);
+  /** Interest earned this year per savings account id; filled in after the list loads. */
+  protected readonly earned = signal<Record<string, string>>({});
 
   protected readonly formatIban = formatIban;
 
@@ -32,9 +34,31 @@ export class Accounts {
   protected load(): void {
     this.loadFailed.set(false);
     this.service.list().subscribe({
-      next: (list) => this.accounts.set(list),
+      next: (list) => {
+        this.accounts.set(list);
+        this.loadInterest(list);
+      },
       error: () => this.loadFailed.set(true),
     });
+  }
+
+  /** The interest line is a nicety: if it cannot be loaded the card simply shows no interest line. */
+  private loadInterest(list: Account[]): void {
+    for (const account of list.filter((a) => a.type === 'SAVINGS')) {
+      this.service.interest(account.id).subscribe({
+        next: (summary) => this.earned.update((current) => ({ ...current, [account.id]: summary.earnedThisYear })),
+        error: () => undefined,
+      });
+    }
+  }
+
+  /** "3.50" -> "3.5" */
+  protected rate(account: Account): string {
+    return String(Number(account.interestRate));
+  }
+
+  protected amountOf(value: string): number {
+    return Number(value);
   }
 
   protected onOpened(account: Account): void {

@@ -116,6 +116,19 @@ describe('History page', () => {
     expect(el.textContent).toContain('2 transactions');
   });
 
+  it('offers an Interest type filter and renders interest as money from the bank', async () => {
+    await open('?account=a', page([
+      item({ transactionId: 'i1', type: 'INTEREST', direction: 'IN', amount: '2.87', balanceAfter: '1002.87',
+        description: 'Interest for September 2026', counterparty: { label: 'Interest earned', iban: null, ownAccount: false } }),
+    ]));
+
+    expect([...field('type').querySelectorAll('option')].map((o) => o.textContent?.trim())).toContain('Interest');
+    const row = el.querySelector('tbody tr')!;
+    expect(row.textContent).toContain('Interest earned');
+    expect(row.textContent).toContain('Interest for September 2026');
+    expect(row.textContent).toContain('+$2.87');
+  });
+
   it('restores filters, paging and sort from the URL', async () => {
     await open('?account=a&type=TRANSFER&direction=OUT&min=10&max=99.5&q=rent&from=2026-03-01&sort=amount,asc&page=2&size=50', null);
 

@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import { Account, DepositRequest, DepositResponse, OpenAccountRequest } from './accounts.models';
+import { Account, DepositRequest, DepositResponse, InterestSummary, OpenAccountRequest } from './accounts.models';
 
 @Injectable({ providedIn: 'root' })
 export class AccountsService {
@@ -9,6 +9,11 @@ export class AccountsService {
 
   list(): Observable<Account[]> {
     return this.http.get<Account[]>('/api/accounts');
+  }
+
+  /** How much interest a savings account has earned this year. */
+  interest(accountId: string): Observable<InterestSummary> {
+    return this.http.get<InterestSummary>(`/api/accounts/${accountId}/interest`);
   }
 
   open(request: OpenAccountRequest): Observable<Account> {

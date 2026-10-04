@@ -4,7 +4,7 @@ export interface HistoryFilter {
   /** Dates are UTC days, "YYYY-MM-DD"; empty string means "no limit". */
   from: string;
   to: string;
-  type: '' | 'DEPOSIT' | 'TRANSFER';
+  type: '' | 'DEPOSIT' | 'TRANSFER' | 'INTEREST';
   direction: '' | 'IN' | 'OUT';
   minAmount: string;
   maxAmount: string;
@@ -22,7 +22,7 @@ export interface Counterparty {
 
 export interface TransactionItem {
   transactionId: string;
-  type: 'DEPOSIT' | 'TRANSFER';
+  type: 'DEPOSIT' | 'TRANSFER' | 'INTEREST';
   direction: 'IN' | 'OUT';
   /** Signed decimal string: "-250.00" for money out, "250.00" for money in. */
   amount: string;

@@ -34,7 +34,7 @@ export function parseQuery(params: ParamMap): HistoryQuery {
     filter: {
       from: params.get('from') ?? '',
       to: params.get('to') ?? '',
-      type: type === 'DEPOSIT' || type === 'TRANSFER' ? type : '',
+      type: type === 'DEPOSIT' || type === 'TRANSFER' || type === 'INTEREST' ? type : '',
       direction: direction === 'IN' || direction === 'OUT' ? direction : '',
       minAmount: params.get('min') ?? '',
       maxAmount: params.get('max') ?? '',

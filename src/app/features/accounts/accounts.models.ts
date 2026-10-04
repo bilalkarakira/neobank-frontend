@@ -10,6 +10,8 @@ export interface Account {
   /** Decimal string such as "0.00"; never parsed for arithmetic on the client. */
   balance: string;
   createdAt: string;
+  /** Yearly rate (APY) as a percentage like "3.50"; only savings accounts have one. */
+  interestRate?: string | null;
 }
 
 export interface OpenAccountRequest {
@@ -30,4 +32,10 @@ export interface DepositResponse {
   /** The account balance right after this deposit. */
   balance: string;
   createdAt: string;
+}
+
+export interface InterestSummary {
+  apyPercent: string | null;
+  /** Interest earned in months of the current year (decimal string). */
+  earnedThisYear: string;
 }

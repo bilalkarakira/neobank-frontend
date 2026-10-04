@@ -44,6 +44,7 @@ describe('Accounts', () => {
   it('renders each account with a formatted IBAN, title and USD balance', () => {
     const fixture = render();
     http.expectOne('/api/accounts').flush([account(), account({ id: '2', type: 'SAVINGS', nickname: 'Holiday', balance: '0.00', iban: 'XX12NEOB1000000002' })]);
+    http.expectOne('/api/accounts/2/interest').flush({ apyPercent: '3.50', earnedThisYear: '0.00', accruals: [] });
     fixture.detectChanges();
     const text = (fixture.nativeElement as HTMLElement).textContent!;
 
@@ -52,6 +53,34 @@ describe('Accounts', () => {
     expect(text).toContain('XX47 NEOB 1000 0000 01');
     expect(text).toContain('$1,250.50');
     expect(text).toContain('$0.00');
+  });
+
+  it('shows the interest rate and the interest earned this year on savings accounts only', () => {
+    const fixture = render();
+    http.expectOne('/api/accounts').flush([
+      account({ id: 'c', type: 'CHECKING' }),
+      account({ id: 's', type: 'SAVINGS', nickname: 'Rainy day', interestRate: '3.50', iban: 'XX12NEOB1000000002' }),
+    ]);
+    // only the savings account asks for its interest (verify() in afterEach fails on any other request)
+    http.expectOne('/api/accounts/s/interest').flush({ apyPercent: '3.50', earnedThisYear: '12.34', accruals: [] });
+    fixture.detectChanges();
+
+    const [checking, savings] = [...(fixture.nativeElement as HTMLElement).querySelectorAll('li')];
+    expect(savings.textContent).toContain('3.5% APY');
+    expect(savings.textContent).toContain('Interest earned this year: $12.34');
+    expect(checking.textContent).not.toContain('APY');
+    expect(checking.textContent).not.toContain('Interest earned');
+  });
+
+  it('still shows a savings account when its interest cannot be loaded', () => {
+    const fixture = render();
+    http.expectOne('/api/accounts').flush([account({ id: 's', type: 'SAVINGS', interestRate: '3.50' })]);
+    http.expectOne('/api/accounts/s/interest').flush({}, { status: 500, statusText: 'Server Error' });
+    fixture.detectChanges();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent!;
+    expect(text).toContain('3.5% APY');
+    expect(text).not.toContain('Interest earned');
   });
 
   it('shows an error with a retry when loading fails', () => {

@@ -38,6 +38,9 @@
               <div>
                 <p class="font-semibold">{{ title(account) }}</p>
                 <p class="text-xs uppercase tracking-wide text-slate-400">{{ account.type }}</p>
+                @if (account.interestRate) {
+                  <p class="mt-1 inline-block rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">{{ rate(account) }}% APY</p>
+                }
               </div>
               @if (account.status !== 'ACTIVE') {
                 <span class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
@@ -49,6 +52,10 @@
             <p class="mt-4 text-2xl font-bold tabular-nums">
               {{ amount(account) | currency: account.currency }}
             </p>
+
+            @if (earned()[account.id]; as interest) {
+              <p class="mt-1 text-xs text-slate-500">Interest earned this year: <span class="font-medium text-slate-700">{{ amountOf(interest) | currency: account.currency }}</span></p>
+            }
 
             <div class="mt-4 flex items-center justify-between gap-2 text-xs text-slate-500">
               <span class="font-mono">{{ formatIban(account.iban) }}</span>

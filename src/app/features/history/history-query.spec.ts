@@ -21,6 +21,10 @@ describe('history query helpers', () => {
     });
   });
 
+  it('accepts the interest transaction type', () => {
+    expect(parseQuery(convertToParamMap({ type: 'INTEREST' })).filter.type).toBe('INTEREST');
+  });
+
   it('ignores junk values instead of passing them to the server', () => {
     const { filter } = parseQuery(
       convertToParamMap({ type: 'EVIL', direction: 'SIDEWAYS', sort: 'x; drop table', page: '-4', size: '9999' }),

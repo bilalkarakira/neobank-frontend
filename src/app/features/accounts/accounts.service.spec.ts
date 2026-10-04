@@ -31,6 +31,13 @@ describe('AccountsService', () => {
     req.flush({});
   });
 
+  it('loads the interest summary of a savings account', () => {
+    service.interest('acc-1').subscribe((summary) => expect(summary.earnedThisYear).toBe('12.34'));
+    const req = http.expectOne('/api/accounts/acc-1/interest');
+    expect(req.request.method).toBe('GET');
+    req.flush({ apyPercent: '3.50', earnedThisYear: '12.34', accruals: [] });
+  });
+
   it('opens an account with POST /api/accounts', () => {
     service.open({ type: 'SAVINGS', nickname: 'Holiday' }).subscribe();
     const req = http.expectOne('/api/accounts');
