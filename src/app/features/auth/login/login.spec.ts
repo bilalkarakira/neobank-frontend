@@ -56,7 +56,7 @@ describe('Login', () => {
     expect(navigate).not.toHaveBeenCalled();
   });
 
-  it('navigates to /home after a successful login', () => {
+  it('navigates to the dashboard after a successful login', () => {
     const fixture = render();
     const el = fixture.nativeElement as HTMLElement;
     const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
@@ -68,6 +68,6 @@ describe('Login', () => {
     controller.expectOne('/api/auth/login').flush({ accessToken: 'tok', tokenType: 'Bearer', expiresIn: 900 });
     controller.expectOne('/api/me').flush({ id: '1', firstName: 'Bilal', lastName: 'K', email: 'bilal@example.com', role: 'CUSTOMER', createdAt: '' });
 
-    expect(navigate).toHaveBeenCalledWith(['/home']);
+    expect(navigate).toHaveBeenCalledWith(['/dashboard']);
   });
 });

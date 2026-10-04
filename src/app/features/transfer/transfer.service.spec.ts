@@ -30,6 +30,13 @@ describe('TransferService', () => {
     req.flush({});
   });
 
+  it('loads the category list', () => {
+    service.categories().subscribe();
+    const req = http.expectOne('/api/categories');
+    expect(req.request.method).toBe('GET');
+    req.flush([]);
+  });
+
   it('loads the daily limits', () => {
     service.limits().subscribe();
     http.expectOne('/api/transfers/limits').flush({});

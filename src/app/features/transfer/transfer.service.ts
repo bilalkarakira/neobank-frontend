@@ -1,7 +1,7 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import { Recipient, TransferLimits, TransferRequest, TransferResponse } from './transfer.models';
+import { Category, Recipient, TransferLimits, TransferRequest, TransferResponse } from './transfer.models';
 
 @Injectable({ providedIn: 'root' })
 export class TransferService {
@@ -12,6 +12,10 @@ export class TransferService {
     return this.http.post<TransferResponse>('/api/transfers', request, {
       headers: { 'Idempotency-Key': idempotencyKey },
     });
+  }
+
+  categories(): Observable<Category[]> {
+    return this.http.get<Category[]>('/api/categories');
   }
 
   limits(): Observable<TransferLimits> {

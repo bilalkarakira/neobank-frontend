@@ -32,13 +32,13 @@ describe('route guards', () => {
     expect(router).toBeTruthy();
   });
 
-  it('guestGuard lets guests in and sends logged-in users to /home', () => {
+  it('guestGuard lets guests in and sends logged-in users to the dashboard', () => {
     const guestRouter = setup(null);
     expect(run(guestGuard)).toBe(true);
 
     const router = setup('tok');
     const result = run(guestGuard) as UrlTree;
-    expect(router.serializeUrl(result)).toBe('/home');
+    expect(router.serializeUrl(result)).toBe('/dashboard');
     expect(guestRouter).toBeTruthy();
   });
 });

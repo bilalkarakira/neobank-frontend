@@ -28,6 +28,8 @@ export interface TransactionItem {
   amount: string;
   balanceAfter: string;
   description: string | null;
+  /** The sender's spending category; only present on outgoing transfers. */
+  category: string | null;
   counterparty: Counterparty;
   createdAt: string;
 }

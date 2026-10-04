@@ -22,6 +22,10 @@ const CHECKING = account({ id: 'a' });
 const SAVINGS = account({ id: 'b', type: 'SAVINGS', nickname: 'Holiday', balance: '0.00', iban: 'XX38NEOB1000000002' });
 const LIMITS: TransferLimits = { dailyLimit: '5000.00', usedToday: '4900.00', remaining: '100.00' };
 const OTHER_IBAN = 'XX65NEOB1000000001'; // a valid IBAN (checksum) used as "someone else's"
+const CATEGORIES = [
+  { id: 'c-groceries', name: 'Groceries' },
+  { id: 'c-dining', name: 'Dining' },
+];
 
 describe('Transfer page', () => {
   let http: HttpTestingController;
@@ -48,6 +52,7 @@ describe('Transfer page', () => {
   const loadData = (accounts: Account[] = [CHECKING, SAVINGS]) => {
     http.expectOne('/api/accounts').flush(accounts);
     http.expectOne('/api/transfers/limits').flush(LIMITS);
+    http.expectOne('/api/categories').flush(CATEGORIES);
     fixture.detectChanges();
   };
   const field = (id: string) => el.querySelector<HTMLInputElement | HTMLSelectElement>('#' + id)!;
@@ -98,6 +103,7 @@ describe('Transfer page', () => {
       destinationIban: 'XX38NEOB1000000002',
       amount: '75.50',
       description: null,
+      categoryId: null, // a category only applies to money sent to someone else
     });
     expect(req.request.headers.get('Idempotency-Key')).toBeTruthy();
     req.flush({
@@ -138,6 +144,63 @@ describe('Transfer page', () => {
     set('amount', '20');
     expect(el.textContent).toContain('Remaining today: $100.00');
     expect(button('Review transfer').disabled).toBe(false);
+  });
+
+  it('offers a category only when sending to someone else, and sends the chosen one', () => {
+    loadData();
+    expect(field('categoryId')).toBeNull(); // my own accounts: no category
+
+    button('Someone else').click();
+    fixture.detectChanges();
+    expect(field('categoryId')).not.toBeNull();
+    expect([...field('categoryId').querySelectorAll('option')].map((o) => o.textContent?.trim())).toEqual([
+      'No category', 'Groceries', 'Dining',
+    ]);
+
+    set('iban', OTHER_IBAN);
+    settle();
+    http.expectOne((r) => r.url === '/api/recipients/lookup').flush({ iban: OTHER_IBAN, ownerName: 'Alice K.' });
+    set('amount', '20');
+    set('categoryId', 'c-dining');
+    button('Review transfer').click();
+    fixture.detectChanges();
+    expect(el.textContent).toContain('Category');
+    expect(el.textContent).toContain('Dining');
+
+    button('Confirm transfer').click();
+    const req = transferRequest();
+    expect(req.request.body.categoryId).toBe('c-dining');
+    req.error(new ProgressEvent('error'));
+  });
+
+  it('treats a different category as a different attempt (new idempotency key)', () => {
+    loadData();
+    button('Someone else').click();
+    fixture.detectChanges();
+    set('iban', OTHER_IBAN);
+    settle();
+    http.expectOne((r) => r.url === '/api/recipients/lookup').flush({ iban: OTHER_IBAN, ownerName: 'Alice K.' });
+    set('amount', '20');
+    set('categoryId', 'c-dining');
+    button('Review transfer').click();
+    fixture.detectChanges();
+
+    button('Confirm transfer').click();
+    const first = transferRequest();
+    const key = first.request.headers.get('Idempotency-Key');
+    first.error(new ProgressEvent('error')); // outcome unknown: the key stays reserved for this exact request
+    fixture.detectChanges();
+
+    button('Back').click();
+    fixture.detectChanges();
+    set('categoryId', 'c-groceries');
+    button('Review transfer').click();
+    fixture.detectChanges();
+    button('Confirm transfer').click();
+    const second = transferRequest();
+
+    expect(second.request.headers.get('Idempotency-Key')).not.toBe(key);
+    second.error(new ProgressEvent('error'));
   });
 
   it('reports an unknown recipient and blocks the review', () => {

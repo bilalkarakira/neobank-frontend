@@ -20,6 +20,7 @@ const item = (overrides: Partial<TransactionItem> = {}): TransactionItem => ({
   amount: '-250.00',
   balanceAfter: '830.00',
   description: 'Rent share',
+  category: null,
   counterparty: { label: 'Second U.', iban: 'XX11NEOB1000000003', ownAccount: false },
   createdAt: '2026-10-04T17:11:08Z',
   ...overrides,

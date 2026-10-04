@@ -36,7 +36,7 @@ export class Login {
     this.error.set(null);
 
     this.auth.login(this.form.getRawValue()).subscribe({
-      next: () => void this.router.navigate(['/home']),
+      next: () => void this.router.navigate(['/dashboard']),
       error: (err: unknown) => {
         this.submitting.set(false);
         const unauthorized = err instanceof HttpErrorResponse && err.status === 401;

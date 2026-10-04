@@ -12,7 +12,7 @@ import { accountTitle } from '../accounts/account-title';
 import { Account } from '../accounts/accounts.models';
 import { AccountsService } from '../accounts/accounts.service';
 import { formatIban, isValidIban, normalizeIban } from '../accounts/iban';
-import { RecipientState, TransferLimits, TransferResponse } from './transfer.models';
+import { Category, RecipientState, TransferLimits, TransferResponse } from './transfer.models';
 import { TransferService } from './transfer.service';
 
 type Step = 'details' | 'review' | 'done';
@@ -47,7 +47,10 @@ export class Transfer {
     iban: [''],
     amount: ['', [Validators.required, amountValidator]],
     description: ['', Validators.maxLength(100)],
+    categoryId: [''],
   });
+
+  protected readonly categories = signal<Category[]>([]);
 
   /** Debounced IBAN lookup: validates the checksum locally first, and only asks the server for plausible IBANs. */
   protected readonly recipient = toSignal(
@@ -108,6 +111,14 @@ export class Transfer {
 
   constructor() {
     this.load();
+    // the dropdown is a convenience: if the list cannot be loaded, transfers still work (uncategorized)
+    this.transfers.categories().subscribe({ next: (list) => this.categories.set(list), error: () => undefined });
+  }
+
+  /** The chosen category's name, for the review step. */
+  protected selectedCategoryName(): string | null {
+    const id = this.form.controls.categoryId.value;
+    return this.categories().find((c) => c.id === id)?.name ?? null;
   }
 
   protected load(): void {
@@ -173,11 +184,14 @@ export class Transfer {
     }
     const amount = normalizeAmount(this.form.controls.amount.value);
     const description = this.form.controls.description.value.trim() || null;
-    const key = this.attempt.keyFor(`${source.id}|${destination.iban}|${amount}|${description ?? ''}`);
+    // a category describes spending, so it only applies when sending to someone else
+    const categoryId = this.sendingToOthers() ? this.form.controls.categoryId.value || null : null;
+    const key = this.attempt.keyFor(`${source.id}|${destination.iban}|${amount}|${description ?? ''}|${categoryId ?? ''}`);
 
     this.submitting.set(true);
     this.error.set(null);
-    this.transfers.transfer({ sourceAccountId: source.id, destinationIban: destination.iban, amount, description }, key)
+    this.transfers
+      .transfer({ sourceAccountId: source.id, destinationIban: destination.iban, amount, description, categoryId }, key)
       .subscribe({
         next: (response) => {
           this.submitting.set(false);
@@ -196,7 +210,7 @@ export class Transfer {
 
   protected another(): void {
     this.result.set(null);
-    this.form.patchValue({ amount: '', description: '', iban: '', toOwnId: '' });
+    this.form.patchValue({ amount: '', description: '', iban: '', toOwnId: '', categoryId: '' });
     this.form.markAsUntouched();
     this.step.set('details');
   }

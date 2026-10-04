@@ -110,6 +110,18 @@
               }
             </div>
 
+            @if (sendingToOthers() && categories().length > 0) {
+              <div>
+                <label class="label" for="categoryId">Category <span class="font-normal text-slate-400">(optional, for your spending overview)</span></label>
+                <select id="categoryId" class="input" formControlName="categoryId">
+                  <option value="">No category</option>
+                  @for (category of categories(); track category.id) {
+                    <option [value]="category.id">{{ category.name }}</option>
+                  }
+                </select>
+              </div>
+            }
+
             <div>
               <label class="label" for="description">Note <span class="font-normal text-slate-400">(optional)</span></label>
               <input id="description" class="input" formControlName="description" maxlength="100"
@@ -143,6 +155,12 @@
                     <dt class="text-slate-500">Amount</dt>
                     <dd class="text-xl font-bold">{{ amountNumber(form.controls.amount.value) | currency: 'USD' }}</dd>
                   </div>
+                  @if (sendingToOthers() && selectedCategoryName(); as categoryName) {
+                    <div class="flex justify-between gap-4">
+                      <dt class="text-slate-500">Category</dt>
+                      <dd class="text-right">{{ categoryName }}</dd>
+                    </div>
+                  }
                   @if (form.controls.description.value.trim(); as note) {
                     <div class="flex justify-between gap-4">
                       <dt class="text-slate-500">Note</dt>

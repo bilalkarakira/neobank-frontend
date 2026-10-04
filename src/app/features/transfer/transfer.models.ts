@@ -4,6 +4,13 @@ export interface TransferRequest {
   /** Decimal string such as "250.00". */
   amount: string;
   description?: string | null;
+  /** Optional spending category; the server keeps it only when sending to another customer. */
+  categoryId?: string | null;
+}
+
+export interface Category {
+  id: string;
+  name: string;
 }
 
 export interface TransferResponse {

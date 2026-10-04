@@ -8,6 +8,7 @@
     @if (auth.isLoggedIn()) {
       <!-- on phones the navigation drops to its own row; from sm up it sits next to the brand -->
       <nav class="order-3 flex w-full items-center gap-1 overflow-x-auto text-sm sm:order-2 sm:w-auto" aria-label="Main">
+        <a routerLink="/dashboard" routerLinkActive="bg-white/10 text-white" class="whitespace-nowrap rounded-lg px-3 py-1.5 text-slate-300 hover:bg-white/10">Dashboard</a>
         <a routerLink="/home" routerLinkActive="bg-white/10 text-white" class="whitespace-nowrap rounded-lg px-3 py-1.5 text-slate-300 hover:bg-white/10">Accounts</a>
         <a routerLink="/transfer" routerLinkActive="bg-white/10 text-white" class="whitespace-nowrap rounded-lg px-3 py-1.5 text-slate-300 hover:bg-white/10">Send money</a>
         <a routerLink="/history" routerLinkActive="bg-white/10 text-white" class="whitespace-nowrap rounded-lg px-3 py-1.5 text-slate-300 hover:bg-white/10">History</a>

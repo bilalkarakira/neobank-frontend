@@ -1,0 +1,224 @@
+<div class="mx-auto w-full max-w-5xl space-y-6 px-4 pb-16 pt-8">
+  <h1 class="text-2xl font-bold">Dashboard</h1>
+
+  @if (accountsFailed()) {
+    <p class="alert-error" role="alert">Could not load your accounts. Please try again later.</p>
+  } @else if (accounts(); as list) {
+    @if (list.length === 0) {
+      <div class="card text-center">
+        <p class="text-lg font-semibold">Welcome to NeoBank</p>
+        <p class="mt-1 text-sm text-slate-500">Open your first account to see your money here.</p>
+        <a routerLink="/home" class="btn-primary mt-4 w-auto px-5">Open an account</a>
+      </div>
+    } @else {
+      <!-- one row of filters above the content; they scope every number below -->
+      <div class="flex flex-wrap items-end gap-x-6 gap-y-3" role="group" aria-label="Dashboard filters">
+        <div>
+          <label class="label" for="dash-account">Account</label>
+          <select id="dash-account" class="input w-auto min-w-52" [value]="query().accountId ?? ''" (change)="setAccount($event)">
+            <option value="" [selected]="!query().accountId">All accounts</option>
+            @for (account of list; track account.id) {
+              <option [value]="account.id" [selected]="account.id === query().accountId">{{ title(account) }}</option>
+            }
+          </select>
+        </div>
+        <div>
+          <span class="label" id="period-label">Period</span>
+          <div class="grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1 text-sm sm:inline-flex" role="group" aria-labelledby="period-label">
+            @for (period of periods; track period.id) {
+              <button type="button" class="whitespace-nowrap rounded-md px-3 py-1.5 font-medium transition"
+                [class.bg-white]="query().period.id === period.id" [class.shadow-sm]="query().period.id === period.id"
+                [attr.aria-pressed]="query().period.id === period.id" (click)="setPeriod(period.id)">
+                {{ period.label }}
+              </button>
+            }
+          </div>
+        </div>
+      </div>
+
+      <!-- headline numbers: ONE hero figure, then two supporting tiles -->
+      <section aria-label="Summary" class="grid gap-4 lg:grid-cols-3">
+        @switch (summary().status) {
+          @case ('ok') {
+            @if (summary(); as s) {
+              @if (s.status === 'ok') {
+                <div class="card lg:col-span-1" [class.opacity-60]="s.refreshing">
+                  <p class="text-sm text-slate-500">Total balance</p>
+                  <p class="mt-1 text-5xl font-semibold tracking-tight">{{ formatMoney(s.data.totalBalance) }}</p>
+                  <p class="mt-2 text-xs text-slate-500">{{ selectedAccount() ? title(selectedAccount()!) : 'All accounts' }}</p>
+                </div>
+                <div class="card" [class.opacity-60]="s.refreshing">
+                  <p class="text-sm text-slate-500">Income in {{ month(s.data.thisMonth.month) }}</p>
+                  <p class="mt-1 text-2xl font-semibold">{{ formatMoney(s.data.thisMonth.income) }}</p>
+                  <p class="mt-2 text-xs text-slate-500">{{ formatChange(s.data.changePercent.income) }}</p>
+                </div>
+                <div class="card" [class.opacity-60]="s.refreshing">
+                  <p class="text-sm text-slate-500">Spending in {{ month(s.data.thisMonth.month) }}</p>
+                  <p class="mt-1 text-2xl font-semibold">{{ formatMoney(s.data.thisMonth.spending) }}</p>
+                  <p class="mt-2 text-xs text-slate-500">{{ formatChange(s.data.changePercent.spending) }}</p>
+                </div>
+              }
+            }
+          }
+          @case ('error') {
+            <p class="alert-error lg:col-span-3" role="alert">
+              Could not load the summary.
+              <button type="button" class="font-medium underline" (click)="retry()">Try again</button>
+            </p>
+          }
+          @default {
+            <div class="card h-32 animate-pulse bg-slate-100 lg:col-span-1"></div>
+            <div class="card h-32 animate-pulse bg-slate-100"></div>
+            <div class="card h-32 animate-pulse bg-slate-100"></div>
+          }
+        }
+      </section>
+
+      <!-- balance over time: one series, so the title names it and there is no legend box -->
+      <section class="card" aria-labelledby="balance-title">
+        <div class="flex items-center justify-between gap-3">
+          <h2 id="balance-title" class="text-base font-semibold">Balance over time</h2>
+          <button type="button" class="text-sm font-medium text-indigo-600 hover:underline" [attr.aria-pressed]="balanceAsTable()"
+            (click)="balanceAsTable.set(!balanceAsTable())">
+            {{ balanceAsTable() ? 'Show chart' : 'Show data as table' }}
+          </button>
+        </div>
+        @switch (balance().status) {
+          @case ('ok') {
+            @if (balance(); as w) {
+              @if (w.status === 'ok') {
+                <div class="mt-4 transition-opacity" [class.opacity-50]="w.refreshing">
+                  @if (balanceAsTable()) {
+                    <div class="max-h-72 overflow-y-auto rounded-lg border border-slate-100">
+                      <table class="w-full text-left text-sm">
+                        <caption class="sr-only">End-of-day balance</caption>
+                        <thead class="sticky top-0 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                          <tr><th scope="col" class="px-3 py-2">Date (UTC)</th><th scope="col" class="px-3 py-2 text-right">Balance</th></tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                          @for (point of w.data; track point.date) {
+                            <tr><td class="px-3 py-1.5">{{ point.date }}</td><td class="px-3 py-1.5 text-right tabular-nums">{{ formatMoney(point.balance) }}</td></tr>
+                          }
+                        </tbody>
+                      </table>
+                    </div>
+                  } @else if (balanceConfig(); as config) {
+                    <div class="h-64">
+                      <app-chart-canvas [config]="config" [label]="balanceLabel()" />
+                    </div>
+                  }
+                </div>
+              }
+            }
+          }
+          @case ('error') {
+            <p class="alert-error mt-4" role="alert">
+              Could not load the balance history.
+              <button type="button" class="font-medium underline" (click)="retry()">Try again</button>
+            </p>
+          }
+          @default { <div class="mt-4 h-64 animate-pulse rounded-lg bg-slate-100"></div> }
+        }
+      </section>
+
+      <div class="grid gap-6 lg:grid-cols-2">
+        <!-- income vs spending: two series, so a legend is always present -->
+        <section class="card flex flex-col" aria-labelledby="cashflow-title">
+          <div class="flex items-center justify-between gap-3">
+            <h2 id="cashflow-title" class="text-base font-semibold">Income vs spending</h2>
+            <button type="button" class="text-sm font-medium text-indigo-600 hover:underline" [attr.aria-pressed]="cashflowAsTable()"
+              (click)="cashflowAsTable.set(!cashflowAsTable())">
+              {{ cashflowAsTable() ? 'Show chart' : 'Show data as table' }}
+            </button>
+          </div>
+          <ul class="mt-2 flex gap-4 text-xs text-slate-600" aria-label="Legend">
+            <li class="flex items-center gap-1.5"><span class="inline-block h-2.5 w-2.5 rounded-sm bg-[var(--viz-income)]" aria-hidden="true"></span>Income</li>
+            <li class="flex items-center gap-1.5"><span class="inline-block h-2.5 w-2.5 rounded-sm bg-[var(--viz-spending)]" aria-hidden="true"></span>Spending</li>
+          </ul>
+          @switch (cashflow().status) {
+            @case ('ok') {
+              @if (cashflow(); as w) {
+                @if (w.status === 'ok') {
+                  <div class="mt-3 flex flex-1 flex-col transition-opacity" [class.opacity-50]="w.refreshing">
+                    @if (cashflowAsTable()) {
+                      <table class="w-full text-left text-sm">
+                        <caption class="sr-only">Income and spending per month</caption>
+                        <thead class="text-xs uppercase tracking-wide text-slate-500">
+                          <tr><th scope="col" class="py-2">Month</th><th scope="col" class="py-2 text-right">Income</th><th scope="col" class="py-2 text-right">Spending</th></tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                          @for (m of w.data; track m.month) {
+                            <tr>
+                              <td class="py-1.5">{{ month(m.month) }}</td>
+                              <td class="py-1.5 text-right tabular-nums">{{ formatMoney(m.income) }}</td>
+                              <td class="py-1.5 text-right tabular-nums">{{ formatMoney(m.spending) }}</td>
+                            </tr>
+                          }
+                        </tbody>
+                      </table>
+                    } @else if (cashflowConfig(); as config) {
+                      <div class="min-h-64 flex-1">
+                        <app-chart-canvas [config]="config" [label]="cashflowLabel()" />
+                      </div>
+                    }
+                  </div>
+                }
+              }
+            }
+            @case ('error') {
+              <p class="alert-error mt-3" role="alert">
+                Could not load the cash flow.
+                <button type="button" class="font-medium underline" (click)="retry()">Try again</button>
+              </p>
+            }
+            @default { <div class="mt-3 h-64 animate-pulse rounded-lg bg-slate-100"></div> }
+          }
+        </section>
+
+        <!-- spending by category: sorted horizontal bars (a donut is poor for comparing values with 6+ parts) -->
+        <section class="card" aria-labelledby="categories-title">
+          <h2 id="categories-title" class="text-base font-semibold">Where your money goes</h2>
+          <p class="mt-1 text-xs text-slate-500">Transfers to other people, last {{ query().period.days }} days. Moves between your own accounts are not spending.</p>
+          @switch (categories().status) {
+            @case ('ok') {
+              @if (categories(); as w) {
+                @if (w.status === 'ok') {
+                  <div class="mt-4 transition-opacity" [class.opacity-50]="w.refreshing">
+                    @if (w.data.categories.length === 0) {
+                      <p class="py-10 text-center text-sm text-slate-500">No spending in this period.</p>
+                    } @else {
+                      <p class="mb-3 text-sm text-slate-600">Total <span class="font-semibold text-slate-900">{{ formatMoney(w.data.total) }}</span></p>
+                      <ul class="space-y-3">
+                        @for (c of categoryBars(); track c.name) {
+                          <li>
+                            <div class="flex items-baseline justify-between gap-3 text-sm">
+                              <span class="font-medium">{{ c.name }}</span>
+                              <span class="tabular-nums text-slate-600">{{ formatMoney(c.total) }} · {{ c.share.toFixed(1) }}%</span>
+                            </div>
+                            <!-- thin bar (<= 24px), 4px rounded tip, square base; the track is a lighter neutral -->
+                            <div class="mt-1 h-3 rounded-r bg-slate-100" aria-hidden="true">
+                              <div class="h-3 rounded-r bg-[var(--viz-spending)]" [style.width.%]="c.width"></div>
+                            </div>
+                          </li>
+                        }
+                      </ul>
+                    }
+                  </div>
+                }
+              }
+            }
+            @case ('error') {
+              <p class="alert-error mt-4" role="alert">
+                Could not load the spending breakdown.
+                <button type="button" class="font-medium underline" (click)="retry()">Try again</button>
+              </p>
+            }
+            @default { <div class="mt-4 h-64 animate-pulse rounded-lg bg-slate-100"></div> }
+          }
+        </section>
+      </div>
+    }
+  } @else {
+    <p class="text-sm text-slate-500">Loading your dashboard…</p>
+  }
+</div>
