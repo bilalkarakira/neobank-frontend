@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { authGuard, guestGuard } from './core/auth/auth.guard';
+import { adminGuard, authGuard, guestGuard } from './core/auth/auth.guard';
 
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
@@ -37,6 +37,11 @@ export const routes: Routes = [
     path: 'history',
     canActivate: [authGuard],
     loadComponent: () => import('./features/history/history').then((m) => m.History),
+  },
+  {
+    path: 'admin',
+    canActivate: [adminGuard],
+    loadComponent: () => import('./features/admin/admin').then((m) => m.Admin),
   },
   { path: '**', redirectTo: 'dashboard' },
 ];

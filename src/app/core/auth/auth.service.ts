@@ -14,6 +14,8 @@ export class AuthService {
 
   readonly user = this.userSignal.asReadonly();
   readonly isLoggedIn = computed(() => this.tokenSignal() !== null);
+  /** UX only (menu link, route guard): the server enforces the role on every /api/admin request. */
+  readonly isAdmin = computed(() => this.userSignal()?.role === 'ADMIN');
 
   get token(): string | null {
     return this.tokenSignal();

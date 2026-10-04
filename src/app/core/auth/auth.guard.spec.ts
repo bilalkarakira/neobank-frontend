@@ -1,8 +1,9 @@
 import { provideHttpClient } from '@angular/common/http';
-import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRouteSnapshot, Router, RouterStateSnapshot, UrlTree, provideRouter } from '@angular/router';
-import { authGuard, guestGuard } from './auth.guard';
+import { adminGuard, authGuard, guestGuard } from './auth.guard';
+import { AuthService } from './auth.service';
 
 describe('route guards', () => {
   const run = (guard: typeof authGuard) =>
@@ -30,6 +31,37 @@ describe('route guards', () => {
     const result = run(authGuard) as UrlTree;
     expect(guestRouter.serializeUrl(result)).toBe('/login');
     expect(router).toBeTruthy();
+  });
+
+  describe('adminGuard', () => {
+    const asUser = (role: 'ADMIN' | 'CUSTOMER') => {
+      const router = setup('tok');
+      TestBed.inject(AuthService).loadUser().subscribe();
+      TestBed.inject(HttpTestingController).expectOne('/api/me').flush({
+        id: 'u', firstName: 'A', lastName: 'B', email: 'a@b.c', role, createdAt: '2026-10-01T00:00:00Z',
+      });
+      return router;
+    };
+
+    it('sends guests to log in', () => {
+      const router = setup(null);
+      expect(router.serializeUrl(run(adminGuard) as UrlTree)).toBe('/login');
+    });
+
+    it('sends customers to the dashboard', () => {
+      const router = asUser('CUSTOMER');
+      expect(router.serializeUrl(run(adminGuard) as UrlTree)).toBe('/dashboard');
+    });
+
+    it('lets administrators in', () => {
+      asUser('ADMIN');
+      expect(run(adminGuard)).toBe(true);
+    });
+
+    it('does not trust a stored token before the user is known', () => {
+      const router = setup('tok'); // logged in, but /api/me has not answered: no role yet
+      expect(router.serializeUrl(run(adminGuard) as UrlTree)).toBe('/dashboard');
+    });
   });
 
   it('guestGuard lets guests in and sends logged-in users to the dashboard', () => {
