@@ -1,5 +1,6 @@
 import { CurrencyPipe } from '@angular/common';
 import { Component, inject, signal } from '@angular/core';
+import { accountTitle } from './account-title';
 import { Account, DepositResponse } from './accounts.models';
 import { AccountsService } from './accounts.service';
 import { DepositForm } from './deposit-form';
@@ -50,9 +51,7 @@ export class Accounts {
     setTimeout(() => this.notice.set(null), 5000);
   }
 
-  protected title(account: Account): string {
-    return account.nickname ?? (account.type === 'CHECKING' ? 'Checking account' : 'Savings account');
-  }
+  protected readonly title = accountTitle;
 
   /** The balance string is only ever displayed here, never used for arithmetic. */
   protected amount(account: Account): number {

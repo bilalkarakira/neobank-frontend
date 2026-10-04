@@ -1,26 +1,11 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, inject, input, output, signal } from '@angular/core';
-import { AbstractControl, FormBuilder, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { amountValidator, normalizeAmount } from '../../core/amount';
 import { ApiProblem } from '../../core/auth/auth.models';
-import { newIdempotencyKey } from '../../core/idempotency-key';
+import { IdempotentAttempt } from '../../core/idempotent-attempt';
 import { Account, DepositResponse } from './accounts.models';
 import { AccountsService } from './accounts.service';
-
-const MIN = 0.01;
-const MAX = 10000;
-
-/** Mirrors the server: positive, at most 2 decimals, at most 10,000.00. Range is checked on the text only. */
-function amountValidator(control: AbstractControl<string>): ValidationErrors | null {
-  const value = control.value.trim();
-  if (value === '') {
-    return null; // "required" reports this
-  }
-  if (!/^\d{1,5}(\.\d{1,2})?$/.test(value)) {
-    return { format: true };
-  }
-  const number = Number(value);
-  return number < MIN || number > MAX ? { range: true } : null;
-}
 
 @Component({
   selector: 'app-deposit-form',
@@ -44,11 +29,7 @@ export class DepositForm {
   protected readonly submitting = signal(false);
   protected readonly error = signal<string | null>(null);
 
-  /**
-   * One key per attempt. If a request fails in a way that leaves the outcome unknown (network error, 5xx) the SAME
-   * key is reused for the retry, so the server cannot credit twice. A different amount is a different attempt.
-   */
-  private attempt: { key: string; amount: string } | null = null;
+  private readonly attempt = new IdempotentAttempt();
 
   protected pick(amount: string): void {
     this.form.controls.amount.setValue(amount);
@@ -60,34 +41,23 @@ export class DepositForm {
       this.form.markAllAsTouched();
       return;
     }
-    const amount = this.normalize(this.form.controls.amount.value);
-    if (this.attempt?.amount !== amount) {
-      this.attempt = { key: newIdempotencyKey(), amount };
-    }
+    const amount = normalizeAmount(this.form.controls.amount.value);
+    const key = this.attempt.keyFor(amount);
 
     this.submitting.set(true);
     this.error.set(null);
-    this.accounts.deposit(this.account().id, { amount }, this.attempt.key).subscribe({
+    this.accounts.deposit(this.account().id, { amount }, key).subscribe({
       next: (response) => {
         this.submitting.set(false);
-        this.attempt = null;
+        this.attempt.succeeded();
         this.deposited.emit(response);
       },
       error: (err: unknown) => {
         this.submitting.set(false);
-        const definitive = err instanceof HttpErrorResponse && err.status >= 400 && err.status < 500;
-        if (definitive) {
-          this.attempt = null; // the server decided: the next try is a new attempt
-        }
+        this.attempt.failed(err);
         this.error.set(this.messageFor(err));
       },
     });
-  }
-
-  /** "50" -> "50.00", "7.5" -> "7.50": the wire format is always two decimals. */
-  private normalize(text: string): string {
-    const [whole, fraction = ''] = text.trim().split('.');
-    return `${whole}.${fraction.padEnd(2, '0')}`;
   }
 
   private messageFor(err: unknown): string {
