@@ -93,6 +93,45 @@ describe('Accounts', () => {
     expect(el.querySelector('form')).toBeNull();
   });
 
+  it('deposits into one account, updates only that balance and shows a confirmation', () => {
+    const fixture = render();
+    http.expectOne('/api/accounts').flush([
+      account({ id: 'a', nickname: 'Daily', balance: '10.00' }),
+      account({ id: 'b', nickname: 'Holiday', balance: '0.00', iban: 'XX12NEOB1000000002' }),
+    ]);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+
+    const depositButtons = [...el.querySelectorAll('li > button')].filter((b) => b.textContent?.trim() === 'Deposit');
+    (depositButtons[1] as HTMLButtonElement).click(); // the Holiday account
+    fixture.detectChanges();
+
+    const input = el.querySelector<HTMLInputElement>('li input')!;
+    input.value = '75';
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    el.querySelector('li form')!.dispatchEvent(new Event('submit'));
+
+    const req = http.expectOne('/api/accounts/b/deposits');
+    expect(req.request.body).toEqual({ amount: '75.00' });
+    req.flush({ transactionId: 't', accountId: 'b', amount: '75.00', balance: '75.00', createdAt: '' });
+    fixture.detectChanges();
+
+    const text = el.textContent!;
+    expect(text).toContain('Deposited $75.00 into Holiday');
+    expect(el.querySelectorAll('li')[0].textContent).toContain('$10.00'); // untouched
+    expect(el.querySelectorAll('li')[1].textContent).toContain('$75.00');
+    expect(el.querySelector('li form')).toBeNull(); // the form closed
+  });
+
+  it('offers no deposit button for accounts that are not active', () => {
+    const fixture = render();
+    http.expectOne('/api/accounts').flush([account({ status: 'FROZEN' })]);
+    fixture.detectChanges();
+
+    expect((fixture.nativeElement as HTMLElement).textContent).not.toContain('Deposit');
+  });
+
   it('shows the limit message from the server when the account limit is reached', () => {
     const fixture = render();
     http.expectOne('/api/accounts').flush([account()]);

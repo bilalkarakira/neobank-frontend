@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import { Account, OpenAccountRequest } from './accounts.models';
+import { Account, DepositRequest, DepositResponse, OpenAccountRequest } from './accounts.models';
 
 @Injectable({ providedIn: 'root' })
 export class AccountsService {
@@ -13,5 +13,12 @@ export class AccountsService {
 
   open(request: OpenAccountRequest): Observable<Account> {
     return this.http.post<Account>('/api/accounts', request);
+  }
+
+  /** The idempotency key makes a retry of the same attempt safe: the server credits the money only once. */
+  deposit(accountId: string, request: DepositRequest, idempotencyKey: string): Observable<DepositResponse> {
+    return this.http.post<DepositResponse>(`/api/accounts/${accountId}/deposits`, request, {
+      headers: { 'Idempotency-Key': idempotencyKey },
+    });
   }
 }

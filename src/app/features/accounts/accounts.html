@@ -9,6 +9,10 @@
     }
   </div>
 
+  @if (notice(); as message) {
+    <p class="alert-success mb-4" role="status">{{ message }}</p>
+  }
+
   @if (showForm()) {
     <div class="mb-6">
       <app-open-account-form (opened)="onOpened($event)" (cancelled)="showForm.set(false)" />
@@ -53,6 +57,19 @@
                 {{ copiedId() === account.id ? 'Copied' : 'Copy' }}
               </button>
             </div>
+
+            @if (account.status === 'ACTIVE') {
+              @if (depositingId() === account.id) {
+                <app-deposit-form [account]="account" (deposited)="onDeposited(account, $event)"
+                  (cancelled)="depositingId.set(null)" />
+              } @else {
+                <button type="button"
+                  class="mt-4 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-50"
+                  (click)="depositingId.set(account.id)">
+                  Deposit
+                </button>
+              }
+            }
           </li>
         }
       </ul>

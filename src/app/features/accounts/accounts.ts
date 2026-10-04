@@ -1,13 +1,14 @@
 import { CurrencyPipe } from '@angular/common';
 import { Component, inject, signal } from '@angular/core';
-import { Account } from './accounts.models';
+import { Account, DepositResponse } from './accounts.models';
 import { AccountsService } from './accounts.service';
+import { DepositForm } from './deposit-form';
 import { formatIban } from './iban';
 import { OpenAccountForm } from './open-account-form';
 
 @Component({
   selector: 'app-accounts',
-  imports: [CurrencyPipe, OpenAccountForm],
+  imports: [CurrencyPipe, OpenAccountForm, DepositForm],
   templateUrl: './accounts.html',
 })
 export class Accounts {
@@ -16,6 +17,8 @@ export class Accounts {
   protected readonly accounts = signal<Account[] | null>(null);
   protected readonly loadFailed = signal(false);
   protected readonly showForm = signal(false);
+  protected readonly depositingId = signal<string | null>(null);
+  protected readonly notice = signal<string | null>(null);
   protected readonly copiedId = signal<string | null>(null);
 
   protected readonly formatIban = formatIban;
@@ -37,6 +40,16 @@ export class Accounts {
     this.showForm.set(false);
   }
 
+  protected onDeposited(account: Account, response: DepositResponse): void {
+    // the server's balance is authoritative: show exactly what it reports
+    this.accounts.update((list) =>
+      (list ?? []).map((a) => (a.id === response.accountId ? { ...a, balance: response.balance } : a)),
+    );
+    this.depositingId.set(null);
+    this.notice.set(`Deposited ${this.money(response.amount, account.currency)} into ${this.title(account)}.`);
+    setTimeout(() => this.notice.set(null), 5000);
+  }
+
   protected title(account: Account): string {
     return account.nickname ?? (account.type === 'CHECKING' ? 'Checking account' : 'Savings account');
   }
@@ -44,6 +57,10 @@ export class Accounts {
   /** The balance string is only ever displayed here, never used for arithmetic. */
   protected amount(account: Account): number {
     return Number(account.balance);
+  }
+
+  private money(value: string, currency: string): string {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(Number(value));
   }
 
   protected async copy(account: Account): Promise<void> {

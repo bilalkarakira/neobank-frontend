@@ -1,0 +1,43 @@
+<form [formGroup]="form" (ngSubmit)="submit()" class="mt-4 space-y-3 border-t border-slate-100 pt-4" novalidate>
+  @if (error(); as message) {
+    <p class="alert-error" role="alert">{{ message }}</p>
+  }
+
+  <div>
+    <label class="label" [attr.for]="'amount-' + account().id">Deposit amount (USD)</label>
+    <div class="flex items-center gap-2">
+      <span class="text-slate-500">$</span>
+      <input [id]="'amount-' + account().id" class="input" formControlName="amount" inputmode="decimal"
+        placeholder="0.00" autocomplete="off"
+        [class.input-invalid]="form.controls.amount.touched && form.controls.amount.invalid" />
+    </div>
+    @if (form.controls.amount.touched && form.controls.amount.invalid) {
+      <p class="field-error">
+        @if (form.controls.amount.hasError('range')) {
+          Enter an amount between 0.01 and 10,000.00.
+        } @else {
+          Enter a valid amount with at most 2 decimals, e.g. 25.50.
+        }
+      </p>
+    }
+  </div>
+
+  <div class="flex flex-wrap gap-2">
+    @for (amount of quickAmounts; track amount) {
+      <button type="button" class="rounded-full border border-slate-300 px-3 py-1 text-xs font-medium hover:bg-slate-50"
+        (click)="pick(amount)">
+        ${{ amount }}
+      </button>
+    }
+  </div>
+
+  <div class="flex gap-2">
+    <button type="submit" class="btn-primary" [disabled]="form.invalid || submitting()">
+      {{ submitting() ? 'Depositing…' : 'Deposit' }}
+    </button>
+    <button type="button" class="rounded-lg px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100"
+      (click)="cancelled.emit()">
+      Cancel
+    </button>
+  </div>
+</form>

@@ -22,6 +22,15 @@ describe('AccountsService', () => {
     req.flush([]);
   });
 
+  it('deposits with POST and an Idempotency-Key header', () => {
+    service.deposit('acc-1', { amount: '10.00' }, 'key-123').subscribe();
+    const req = http.expectOne('/api/accounts/acc-1/deposits');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.headers.get('Idempotency-Key')).toBe('key-123');
+    expect(req.request.body).toEqual({ amount: '10.00' });
+    req.flush({});
+  });
+
   it('opens an account with POST /api/accounts', () => {
     service.open({ type: 'SAVINGS', nickname: 'Holiday' }).subscribe();
     const req = http.expectOne('/api/accounts');

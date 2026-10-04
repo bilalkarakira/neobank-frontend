@@ -16,3 +16,18 @@ export interface OpenAccountRequest {
   type: AccountType;
   nickname: string | null;
 }
+
+export interface DepositRequest {
+  /** Decimal string such as "100.00". */
+  amount: string;
+  description?: string | null;
+}
+
+export interface DepositResponse {
+  transactionId: string;
+  accountId: string;
+  amount: string;
+  /** The account balance right after this deposit. */
+  balance: string;
+  createdAt: string;
+}
