@@ -145,6 +145,26 @@ describe('History page', () => {
     ]);
   });
 
+  it('keeps the less common filters folded away until one of them is in use', async () => {
+    await open('', page([item()]));
+    const folded = el.querySelector('details')!;
+    expect(folded.open).toBe(false);
+    expect(folded.textContent).toContain('More filters');
+    // the everyday ones stay in view, the rest live inside the fold
+    expect(folded.contains(field('recurring'))).toBe(true);
+    expect(folded.contains(field('minAmount'))).toBe(true);
+    expect(folded.contains(field('type'))).toBe(false);
+    expect(folded.contains(field('q'))).toBe(false);
+  });
+
+  it('opens the fold by itself when a filter inside it is active, so an active filter is never hidden', async () => {
+    await open('?account=a&recurring=true', null);
+    listRequest().flush(page([item({ recurring: true })]));
+    harness.detectChanges();
+
+    expect(el.querySelector('details')!.open).toBe(true);
+  });
+
   it('restores the recurring filter from the URL and sends it to the server', async () => {
     await open('?account=a&recurring=true', null);
 

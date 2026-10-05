@@ -222,6 +222,12 @@ export class History {
     return item.direction === 'IN' ? '+' : '−';
   }
 
+  /** The folded-away filters open by themselves when one of them is in use, so an active filter is never hidden. */
+  protected moreFiltersActive(): boolean {
+    const v = this.form.getRawValue();
+    return !!(v.from || v.to || v.minAmount || v.maxAmount || v.recurring);
+  }
+
   protected firstRow(page: { page: number; size: number }): number {
     return page.page * page.size + 1;
   }

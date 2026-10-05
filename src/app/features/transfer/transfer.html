@@ -35,13 +35,13 @@
               <legend class="label">To</legend>
               <div class="mb-3 grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1 text-sm" role="tablist">
                 <button type="button" role="tab" [attr.aria-selected]="!sendingToOthers()"
-                  class="rounded-lg px-3 py-2 font-medium text-slate-600 transition"
+                  class="rounded-xl px-3 py-2 font-medium text-slate-600 transition"
                   [class.bg-white]="!sendingToOthers()" [class.shadow-sm]="!sendingToOthers()" [class.text-slate-900]="!sendingToOthers()"
                   (click)="setMode('own')">
                   My accounts
                 </button>
                 <button type="button" role="tab" [attr.aria-selected]="sendingToOthers()"
-                  class="rounded-lg px-3 py-2 font-medium text-slate-600 transition"
+                  class="rounded-xl px-3 py-2 font-medium text-slate-600 transition"
                   [class.bg-white]="sendingToOthers()" [class.shadow-sm]="sendingToOthers()" [class.text-slate-900]="sendingToOthers()"
                   (click)="setMode('other')">
                   Someone else

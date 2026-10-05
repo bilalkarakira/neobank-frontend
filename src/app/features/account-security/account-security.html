@@ -16,12 +16,12 @@
         @if (confirming() === 'others') {
           <span class="flex items-center gap-2 text-sm">
             <span class="text-slate-600">Log out {{ otherCount() }} other device(s)?</span>
-            <button type="button" class="rounded-lg bg-red-600 px-3 py-1.5 font-semibold text-white hover:bg-red-500 disabled:opacity-50"
+            <button type="button" class="rounded-xl bg-red-600 px-3 py-1.5 font-semibold text-white hover:bg-red-500 disabled:opacity-50"
               [disabled]="busy()" (click)="revokeOthers()">Yes, log them out</button>
-            <button type="button" class="rounded-lg px-3 py-1.5 font-medium text-slate-600 hover:bg-slate-100" (click)="cancelAsk()">Keep</button>
+            <button type="button" class="rounded-xl px-3 py-1.5 font-medium text-slate-600 hover:bg-slate-100" (click)="cancelAsk()">Keep</button>
           </span>
         } @else {
-          <button type="button" class="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium hover:bg-slate-50"
+          <button type="button" class="rounded-xl border border-slate-300 px-3 py-1.5 text-sm font-medium hover:bg-slate-50"
             (click)="ask('others')">Log out all other devices</button>
         }
       }
@@ -41,7 +41,15 @@
         @for (s of list; track s.id) {
           <li class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <div class="flex items-start justify-between gap-4">
-              <div class="min-w-0">
+              <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl" aria-hidden="true"
+                [class.bg-brand-50]="s.current" [class.text-brand-700]="s.current" [class.bg-slate-100]="!s.current" [class.text-slate-500]="!s.current">
+                @if (s.device.includes('iOS') || s.device.includes('Android')) {
+                  <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 1.5H8.25A2.25 2.25 0 0 0 6 3.75v16.5a2.25 2.25 0 0 0 2.25 2.25h7.5A2.25 2.25 0 0 0 18 20.25V3.75a2.25 2.25 0 0 0-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" /></svg>
+                } @else {
+                  <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 17.25v1.007a3 3 0 0 1-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0 1 15 18.257V17.25m6-12V15a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 15V5.25A2.25 2.25 0 0 1 5.25 3h13.5A2.25 2.25 0 0 1 21 5.25Z" /></svg>
+                }
+              </span>
+              <div class="min-w-0 flex-1">
                 <p class="font-semibold">
                   {{ s.device }}
                   @if (s.current) {
@@ -56,12 +64,12 @@
               </div>
               @if (confirming() === s.id) {
                 <span class="flex shrink-0 items-center gap-2 text-sm">
-                  <button type="button" class="rounded-lg bg-red-600 px-3 py-1.5 font-semibold text-white hover:bg-red-500 disabled:opacity-50"
+                  <button type="button" class="rounded-xl bg-red-600 px-3 py-1.5 font-semibold text-white hover:bg-red-500 disabled:opacity-50"
                     [disabled]="busy()" (click)="revoke(s)">{{ s.current ? 'Yes, log out' : 'Yes, remove' }}</button>
-                  <button type="button" class="rounded-lg px-3 py-1.5 font-medium text-slate-600 hover:bg-slate-100" (click)="cancelAsk()">Keep</button>
+                  <button type="button" class="rounded-xl px-3 py-1.5 font-medium text-slate-600 hover:bg-slate-100" (click)="cancelAsk()">Keep</button>
                 </span>
               } @else {
-                <button type="button" class="shrink-0 rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium hover:bg-slate-50"
+                <button type="button" class="shrink-0 rounded-xl border border-slate-300 px-3 py-1.5 text-sm font-medium hover:bg-slate-50"
                   (click)="ask(s.id)">{{ s.current ? 'Log out' : 'Remove' }}</button>
               }
             </div>
