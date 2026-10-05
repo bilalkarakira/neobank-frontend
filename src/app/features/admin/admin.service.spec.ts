@@ -51,6 +51,23 @@ describe('AdminService', () => {
     unfreeze.flush(null);
   });
 
+  it('reads the security status and lifts locks and blocks with a reason in the body', () => {
+    service.security().subscribe();
+    expect(http.expectOne('/api/admin/security').request.method).toBe('GET');
+
+    service.unlockLogin('alice@example.com', 'Verified').subscribe();
+    const unlock = http.expectOne('/api/admin/security/login-lockouts/unlock');
+    expect(unlock.request.method).toBe('POST');
+    expect(unlock.request.body).toEqual({ email: 'alice@example.com', reason: 'Verified' });
+    unlock.flush(null);
+
+    service.clearProbingBlock('u-1', 'Checked').subscribe();
+    const clear = http.expectOne('/api/admin/security/probing-blocks/u-1/clear');
+    expect(clear.request.method).toBe('POST');
+    expect(clear.request.body).toEqual({ reason: 'Checked' });
+    clear.flush(null);
+  });
+
   it('triggers the jobs with POST and reads the audit log', () => {
     service.runInterest().subscribe();
     expect(http.expectOne('/api/admin/jobs/interest').request.method).toBe('POST');

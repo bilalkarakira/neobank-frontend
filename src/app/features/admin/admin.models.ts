@@ -13,6 +13,7 @@ export interface Overview {
   transfersLast30Days: Volume;
   interestPaid: string;
   recurring: { active: number; paused: number; failedRunsLast7Days: number };
+  security: { lockedLogins: number; probingBlocks: number };
 }
 
 export interface Reconciliation {
@@ -63,4 +64,26 @@ export interface RecurringRunSummary {
   skippedByLock: boolean;
   succeeded: number;
   failed: number;
+}
+
+/** A customer who cannot log in right now because of too many wrong passwords. */
+export interface LockedLogin {
+  email: string;
+  failures: number;
+  lockedUntil: string;
+}
+
+/** A user who cannot look up or send to IBANs right now because of too many unknown ones. */
+export interface ProbingBlock {
+  userId: string;
+  email: string;
+  misses: number;
+  blockedUntil: string;
+}
+
+export interface SecuritySnapshot {
+  lockedLogins: LockedLogin[];
+  /** Locks on addresses that belong to no customer: counted only, nobody is affected. */
+  otherLockedAddresses: number;
+  probingBlocks: ProbingBlock[];
 }

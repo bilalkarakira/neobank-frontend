@@ -13,11 +13,15 @@ import {
   AuditEntry,
   Overview,
   Reconciliation,
+  SecuritySnapshot,
 } from './admin.models';
 import { AdminService } from './admin.service';
 
-type Tab = 'overview' | 'accounts' | 'audit';
+type Tab = 'overview' | 'accounts' | 'security' | 'audit';
 type Pending = { account: AdminAccount; kind: 'freeze' | 'unfreeze' };
+type PendingSecurity =
+  | { kind: 'login'; email: string }
+  | { kind: 'probing'; userId: string; email: string };
 
 const PAGE_SIZE = 20;
 
@@ -26,6 +30,8 @@ const ACTION_LABELS: Record<string, string> = {
   UNFREEZE_ACCOUNT: 'Unfroze account',
   RUN_INTEREST: 'Ran the interest job',
   RUN_RECURRING: 'Ran recurring payments',
+  UNLOCK_LOGIN: 'Unlocked a login',
+  CLEAR_PROBING_BLOCK: 'Lifted a probing block',
 };
 
 @Component({
@@ -57,6 +63,13 @@ export class Admin {
   protected readonly reason = this.fb.control('', [Validators.required, Validators.maxLength(200)]);
   protected readonly acting = signal(false);
 
+  // security
+  protected readonly security = signal<SecuritySnapshot | null>(null);
+  protected readonly securityFailed = signal(false);
+  protected readonly pendingSecurity = signal<PendingSecurity | null>(null);
+  protected readonly securityReason = this.fb.control('', [Validators.required, Validators.maxLength(200)]);
+  protected readonly securityActing = signal(false);
+
   // audit
   protected readonly audit = signal<AuditEntry[] | null>(null);
   protected readonly auditFailed = signal(false);
@@ -80,6 +93,10 @@ export class Admin {
     this.error.set(null);
     if (tab === 'accounts' && this.page() === null) {
       this.loadAccounts(0);
+    }
+    if (tab === 'security') {
+      this.pendingSecurity.set(null);
+      this.loadSecurity();
     }
     if (tab === 'audit') {
       this.loadAudit();
@@ -215,6 +232,59 @@ export class Admin {
     this.pending.set(null);
   }
 
+  // ---- security ---------------------------------------------------------------------------------------------
+
+  protected loadSecurity(): void {
+    this.securityFailed.set(false);
+    this.api.security().subscribe({
+      next: (snapshot) => this.security.set(snapshot),
+      error: () => this.securityFailed.set(true),
+    });
+  }
+
+  protected askUnlock(email: string): void {
+    this.securityReason.reset('');
+    this.error.set(null);
+    this.pendingSecurity.set({ kind: 'login', email });
+  }
+
+  protected askClearBlock(userId: string, email: string): void {
+    this.securityReason.reset('');
+    this.error.set(null);
+    this.pendingSecurity.set({ kind: 'probing', userId, email });
+  }
+
+  protected cancelSecurity(): void {
+    this.pendingSecurity.set(null);
+  }
+
+  protected confirmSecurity(): void {
+    const pending = this.pendingSecurity();
+    const reason = this.securityReason.value.trim();
+    if (!pending || reason === '' || this.securityReason.invalid || this.securityActing()) {
+      this.securityReason.markAsTouched();
+      return;
+    }
+    this.securityActing.set(true);
+    const request =
+      pending.kind === 'login' ? this.api.unlockLogin(pending.email, reason) : this.api.clearProbingBlock(pending.userId, reason);
+    request.subscribe({
+      next: () => {
+        this.securityActing.set(false);
+        this.pendingSecurity.set(null);
+        this.notice.set(pending.kind === 'login' ? `${pending.email} can log in again.` : `${pending.email} can look up recipients again.`);
+        this.loadSecurity();
+        this.audit.set(null);
+        this.loadOverview();
+      },
+      error: (err: unknown) => {
+        this.securityActing.set(false);
+        this.error.set(this.messageFor(err));
+        this.loadSecurity(); // it may have expired or been lifted by someone else: show the truth
+      },
+    });
+  }
+
   // ---- audit ------------------------------------------------------------------------------------------------
 
   protected loadAudit(): void {
@@ -234,6 +304,12 @@ export class Admin {
       const problem = err.error as ApiProblem | null;
       if (problem?.code === 'ADMIN_INVALID_STATE' && problem.detail) {
         return problem.detail;
+      }
+      if (problem?.code === 'NOT_LOCKED') {
+        return 'That customer is no longer locked out.';
+      }
+      if (problem?.code === 'NOT_BLOCKED') {
+        return 'That user is no longer blocked.';
       }
       if (problem?.code === 'ACCOUNT_NOT_FOUND') {
         return 'This account no longer exists.';

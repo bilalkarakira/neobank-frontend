@@ -9,6 +9,7 @@ import {
   Overview,
   Reconciliation,
   RecurringRunSummary,
+  SecuritySnapshot,
 } from './admin.models';
 
 @Injectable({ providedIn: 'root' })
@@ -48,6 +49,18 @@ export class AdminService {
 
   runRecurring(): Observable<RecurringRunSummary> {
     return this.http.post<RecurringRunSummary>('/api/admin/jobs/recurring', null);
+  }
+
+  security(): Observable<SecuritySnapshot> {
+    return this.http.get<SecuritySnapshot>('/api/admin/security');
+  }
+
+  unlockLogin(email: string, reason: string): Observable<void> {
+    return this.http.post<void>('/api/admin/security/login-lockouts/unlock', { email, reason });
+  }
+
+  clearProbingBlock(userId: string, reason: string): Observable<void> {
+    return this.http.post<void>(`/api/admin/security/probing-blocks/${userId}/clear`, { reason });
   }
 
   audit(): Observable<AuditEntry[]> {

@@ -2,7 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Admin } from './admin';
-import { AdminAccount, AdminAccountPage, AuditEntry, Overview, Reconciliation } from './admin.models';
+import { AdminAccount, AdminAccountPage, AuditEntry, Overview, Reconciliation, SecuritySnapshot } from './admin.models';
 
 const OVERVIEW: Overview = {
   generatedAt: '2026-10-04T12:00:00Z',
@@ -13,6 +13,7 @@ const OVERVIEW: Overview = {
   transfersLast30Days: { count: 40, amount: '9000.00' },
   interestPaid: '55.25',
   recurring: { active: 3, paused: 1, failedRunsLast7Days: 2 },
+  security: { lockedLogins: 2, probingBlocks: 1 },
 };
 const HEALTHY: Reconciliation = {
   healthy: true,
@@ -261,6 +262,148 @@ describe('Admin page', () => {
     );
     fixture.detectChanges();
     expect(el.textContent).toContain('The account is ACTIVE, so it cannot be unfrozen.');
+  });
+
+  // ---- security ---------------------------------------------------------------------------------------------
+
+  const SNAPSHOT: SecuritySnapshot = {
+    lockedLogins: [{ email: 'alice@example.com', failures: 5, lockedUntil: '2026-10-05T12:15:00Z' }],
+    otherLockedAddresses: 3,
+    probingBlocks: [{ userId: 'u-bob', email: 'bob@example.com', misses: 10, blockedUntil: '2026-10-05T12:10:00Z' }],
+  };
+  const openSecurity = (snapshot: SecuritySnapshot = SNAPSHOT) => {
+    loadOverview();
+    click('Security');
+    http.expectOne('/api/admin/security').flush(snapshot);
+    fixture.detectChanges();
+  };
+
+  it('shows the lock and block counts on the overview, with a way to review them', () => {
+    loadOverview();
+    const text = el.textContent ?? '';
+    expect(text).toContain('2 customer(s) locked out of login');
+    expect(text).toContain('1 user(s) blocked for probing IBANs');
+    click('Review');
+    http.expectOne('/api/admin/security').flush(SNAPSHOT);
+    fixture.detectChanges();
+    expect(el.textContent).toContain('Locked out of login');
+  });
+
+  it('lists locked customers and blocked users, and mentions locks that belong to no customer', () => {
+    openSecurity();
+    const text = el.textContent ?? '';
+    expect(text).toContain('alice@example.com');
+    expect(text).toContain('bob@example.com');
+    expect(text).toContain('3 more locked address(es) belong to no customer');
+    expect(button('Unlock')).toBeTruthy();
+    expect(button('Lift block')).toBeTruthy();
+  });
+
+  it('says so when nobody is locked or blocked', () => {
+    openSecurity({ lockedLogins: [], otherLockedAddresses: 0, probingBlocks: [] });
+    const text = el.textContent ?? '';
+    expect(text).toContain('No customer is locked out right now.');
+    expect(text).toContain('Nobody is blocked right now.');
+    expect(text).not.toContain('more locked address');
+  });
+
+  it('needs a reason before unlocking and sends nothing without one', () => {
+    openSecurity();
+    click('Unlock');
+    expect(el.textContent).toContain('Let alice@example.com log in again?');
+    click('Unlock login');
+    http.expectNone('/api/admin/security/login-lockouts/unlock');
+    expect(el.textContent).toContain('A reason is required.');
+
+    set('security-reason', '   ');
+    click('Unlock login');
+    http.expectNone('/api/admin/security/login-lockouts/unlock');
+  });
+
+  it('unlocks with the trimmed reason, then reloads the list and the figures', () => {
+    openSecurity();
+    click('Unlock');
+    set('security-reason', ' Verified by phone ');
+    click('Unlock login');
+
+    const req = http.expectOne('/api/admin/security/login-lockouts/unlock');
+    expect(req.request.body).toEqual({ email: 'alice@example.com', reason: 'Verified by phone' });
+    req.flush(null, { status: 204, statusText: 'No Content' });
+    fixture.detectChanges();
+
+    expect(el.textContent).toContain('alice@example.com can log in again.');
+    http.expectOne('/api/admin/security').flush({ ...SNAPSHOT, lockedLogins: [] });
+    http.expectOne('/api/admin/overview').flush(OVERVIEW);
+    http.expectOne('/api/admin/reconciliation').flush(HEALTHY);
+    fixture.detectChanges();
+    expect(el.textContent).toContain('No customer is locked out right now.');
+  });
+
+  it('lifts a probing block with the user id and the reason', () => {
+    openSecurity();
+    click('Lift block');
+    expect(el.textContent).toContain('Let bob@example.com look up recipients again?');
+    set('security-reason', 'Checked with the customer');
+    click('Lift block'); // the confirm button has the same label; the first match is now the confirm one
+
+    const req = http.expectOne('/api/admin/security/probing-blocks/u-bob/clear');
+    expect(req.request.body).toEqual({ reason: 'Checked with the customer' });
+    req.flush(null, { status: 204, statusText: 'No Content' });
+    fixture.detectChanges();
+    expect(el.textContent).toContain('bob@example.com can look up recipients again.');
+    http.expectOne('/api/admin/security').flush({ ...SNAPSHOT, probingBlocks: [] });
+    http.expectOne('/api/admin/overview').flush(OVERVIEW);
+    http.expectOne('/api/admin/reconciliation').flush(HEALTHY);
+  });
+
+  it('can back out without sending anything', () => {
+    openSecurity();
+    click('Unlock');
+    click('Cancel');
+    expect(el.textContent).not.toContain('Confirm security action');
+  });
+
+  it('explains it and refreshes the list when the lock had already ended', () => {
+    openSecurity();
+    click('Unlock');
+    set('security-reason', 'Verified');
+    click('Unlock login');
+    http.expectOne('/api/admin/security/login-lockouts/unlock').flush(
+      { code: 'NOT_LOCKED' },
+      { status: 404, statusText: 'Not Found' },
+    );
+    fixture.detectChanges();
+
+    expect(el.textContent).toContain('That customer is no longer locked out.');
+    http.expectOne('/api/admin/security').flush({ ...SNAPSHOT, lockedLogins: [] }); // shows the truth
+  });
+
+  it('offers a retry when the security status cannot be loaded', () => {
+    loadOverview();
+    click('Security');
+    http.expectOne('/api/admin/security').flush(null, { status: 500, statusText: 'Server Error' });
+    fixture.detectChanges();
+    expect(el.textContent).toContain('Could not load the security status.');
+    click('Try again');
+    http.expectOne('/api/admin/security').flush(SNAPSHOT);
+    fixture.detectChanges();
+    expect(el.textContent).toContain('alice@example.com');
+  });
+
+  it('describes the new audit actions in plain language, with the reason and the detail together', () => {
+    loadOverview();
+    click('Audit log');
+    http.expectOne('/api/admin/audit').flush([
+      { id: 2, at: '2026-10-05T12:00:00Z', adminEmail: 'ada@example.com', action: 'UNLOCK_LOGIN', accountIban: null, reason: 'Verified by phone', detail: 'email=alice@example.com' },
+      { id: 1, at: '2026-10-05T11:00:00Z', adminEmail: 'ada@example.com', action: 'CLEAR_PROBING_BLOCK', accountIban: null, reason: 'Checked', detail: 'user=bob@example.com' },
+    ]);
+    fixture.detectChanges();
+    const text = el.textContent ?? '';
+    expect(text).toContain('Unlocked a login');
+    expect(text).toContain('Lifted a probing block');
+    expect(text).toContain('Verified by phone');
+    expect(text).toContain('email=alice@example.com');
+    expect(text).not.toContain('UNLOCK_LOGIN');
   });
 
   // ---- audit ------------------------------------------------------------------------------------------------
