@@ -1,6 +1,7 @@
 import { Component, effect, inject, signal } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AuthService } from './core/auth/auth.service';
+import { Logo } from './core/logo';
 import { NotificationsService } from './features/notifications/notifications.service';
 
 /** 24x24 outline icon paths (Heroicons, MIT), drawn with a 1.6 stroke. */
@@ -35,7 +36,7 @@ const RECURRING: NavItem = { path: '/recurring', label: 'Recurring', icon: ICONS
 const HISTORY: NavItem = { path: '/history', label: 'History', icon: ICONS.clock };
 
 @Component({
-  imports: [RouterOutlet, RouterLink, RouterLinkActive],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, Logo],
   selector: 'app-root',
   templateUrl: './app.html',
 })

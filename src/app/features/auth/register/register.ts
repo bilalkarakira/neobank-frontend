@@ -5,10 +5,11 @@ import { Router, RouterLink } from '@angular/router';
 import { ApiProblem } from '../../../core/auth/auth.models';
 import { AuthService } from '../../../core/auth/auth.service';
 import { isRateLimited, tooManyMessage } from '../../../core/rate-limit';
+import { Logo } from '../../../core/logo';
 
 @Component({
   selector: 'app-register',
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink, Logo],
   templateUrl: './register.html',
 })
 export class Register {

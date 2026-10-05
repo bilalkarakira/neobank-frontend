@@ -1,10 +1,7 @@
 @if (auth.isLoggedIn()) {
   <!-- Desktop: a fixed sidebar, like the web apps of Monzo, Revolut and Wise. Phones: a top bar and a bottom tab bar. -->
   <aside class="fixed inset-y-0 left-0 z-20 hidden w-64 flex-col bg-slate-900 text-slate-300 lg:flex">
-    <a routerLink="/" class="flex items-center gap-3 px-6 pb-6 pt-7 text-white">
-      <span class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-400 to-violet-600 text-base font-bold shadow-lg shadow-indigo-900/40">N</span>
-      <span class="text-xl font-bold tracking-tight">NeoBank</span>
-    </a>
+    <a routerLink="/" class="block px-6 pb-6 pt-7 text-white" aria-label="NeoBank home"><app-logo [size]="38" [onDark]="true" /></a>
 
     <nav class="flex-1 overflow-y-auto px-3" aria-label="Main">
       <ul class="space-y-1">
@@ -66,10 +63,7 @@
   </aside>
 
   <header class="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-slate-200 bg-white/90 px-4 backdrop-blur lg:hidden">
-    <a routerLink="/" class="flex items-center gap-2 font-bold tracking-tight text-slate-900">
-      <span class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 text-sm text-white">N</span>
-      NeoBank
-    </a>
+    <a routerLink="/" class="text-slate-900" aria-label="NeoBank home"><app-logo [size]="32" /></a>
     <a routerLink="/notifications" class="relative rounded-full p-2 text-slate-600 hover:bg-slate-100" aria-label="Notifications">
       <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path [attr.d]="icons.bell" /></svg>
       @if (notifications.unread() > 0) {
@@ -126,10 +120,7 @@
 } @else {
   <header class="bg-slate-900 text-white">
     <div class="mx-auto flex h-14 max-w-5xl items-center px-4">
-      <a routerLink="/" class="flex items-center gap-2 text-lg font-bold tracking-tight">
-        <span class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-400 to-violet-600 text-sm">N</span>
-        NeoBank
-      </a>
+      <a routerLink="/" class="text-white" aria-label="NeoBank home"><app-logo [size]="32" [onDark]="true" /></a>
     </div>
   </header>
   <main>
