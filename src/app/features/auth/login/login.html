@@ -8,7 +8,7 @@
         <p class="alert-success" role="status">Account created. Please log in.</p>
       }
       @if (sessionExpired) {
-        <p class="alert-error" role="alert">Your session has expired. Please log in again.</p>
+        <p class="alert-error" role="alert">Your session has ended. It may have expired, or been ended from another device. Please log in again.</p>
       }
       @if (error(); as message) {
         <p class="alert-error" role="alert">{{ message }}</p>

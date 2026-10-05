@@ -1,7 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { Router, provideRouter } from '@angular/router';
+import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { Login } from './login';
 
 describe('Login', () => {
@@ -91,6 +91,25 @@ describe('Login', () => {
     fixture.detectChanges();
 
     expect(el.querySelector('[role=alert]')?.textContent).toContain('about 45 seconds');
+  });
+
+  it('explains that a session can also have been ended from another device when sent here after a 401', () => {
+    localStorage.clear();
+    TestBed.configureTestingModule({
+      imports: [Login],
+      providers: [
+        provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap({ expired: '1' }) } } },
+      ],
+    });
+    const fixture = TestBed.createComponent(Login);
+    fixture.detectChanges();
+
+    const text = (fixture.nativeElement as HTMLElement).querySelector('[role=alert]')?.textContent ?? '';
+    expect(text).toContain('Your session has ended.');
+    expect(text).toContain('ended from another device');
   });
 
   it('navigates to the dashboard after a successful login', () => {
