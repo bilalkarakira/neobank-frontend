@@ -1,5 +1,5 @@
 import { CurrencyPipe } from '@angular/common';
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { accountTitle } from './account-title';
 import { Account, DepositResponse } from './accounts.models';
@@ -26,6 +26,9 @@ export class Accounts {
   protected readonly earned = signal<Record<string, string>>({});
 
   protected readonly formatIban = formatIban;
+
+  /** Sum of the open and frozen balances (closed accounts are empty by rule). Every account is in USD. */
+  protected readonly total = computed(() => (this.accounts() ?? []).reduce((sum, a) => sum + Number(a.balance), 0));
 
   constructor() {
     this.load();

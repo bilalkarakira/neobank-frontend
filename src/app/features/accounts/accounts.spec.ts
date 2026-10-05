@@ -55,6 +55,22 @@ describe('Accounts', () => {
     expect(text).toContain('$0.00');
   });
 
+  it('shows the total balance across all accounts, and none when there are no accounts', () => {
+    const fixture = render();
+    http.expectOne('/api/accounts').flush([account({ balance: '1250.50' }), account({ id: '2', iban: 'XX12NEOB1000000002', balance: '49.50' })]);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('[data-testid=total-balance]')?.textContent).toContain('$1,300.00');
+    expect(el.textContent).toContain('Across 2 accounts');
+  });
+
+  it('shows no total card before the first account exists', () => {
+    const fixture = render();
+    http.expectOne('/api/accounts').flush([]);
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid=total-balance]')).toBeNull();
+  });
+
   it('shows the interest rate and the interest earned this year on savings accounts only', () => {
     const fixture = render();
     http.expectOne('/api/accounts').flush([

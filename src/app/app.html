@@ -1,4 +1,4 @@
-<header class="bg-slate-900 text-white">
+<header class="sticky top-0 z-10 border-b border-white/10 bg-slate-900/95 text-white backdrop-blur">
   <div class="mx-auto flex max-w-5xl flex-wrap items-center gap-x-6 gap-y-1 px-4 py-2 sm:h-14 sm:flex-nowrap sm:py-0">
     <a routerLink="/" class="order-1 flex items-center gap-2 text-lg font-bold tracking-tight">
       <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-500 text-sm">N</span>
@@ -7,7 +7,7 @@
 
     @if (auth.isLoggedIn()) {
       <!-- on phones the navigation drops to its own row; from sm up it sits next to the brand -->
-      <nav class="order-3 flex w-full items-center gap-1 overflow-x-auto text-sm sm:order-2 sm:w-auto" aria-label="Main">
+      <nav class="order-3 flex w-full items-center gap-1 overflow-x-auto text-sm [-ms-overflow-style:none] [scrollbar-width:none] sm:order-2 sm:w-auto [&::-webkit-scrollbar]:hidden" aria-label="Main">
         <a routerLink="/dashboard" routerLinkActive="bg-white/10 text-white" class="whitespace-nowrap rounded-lg px-3 py-1.5 text-slate-300 hover:bg-white/10">Dashboard</a>
         <a routerLink="/home" routerLinkActive="bg-white/10 text-white" class="whitespace-nowrap rounded-lg px-3 py-1.5 text-slate-300 hover:bg-white/10">Accounts</a>
         <a routerLink="/transfer" routerLinkActive="bg-white/10 text-white" class="whitespace-nowrap rounded-lg px-3 py-1.5 text-slate-300 hover:bg-white/10">Send money</a>
@@ -27,7 +27,10 @@
 
       <div class="order-2 ml-auto flex items-center gap-3 text-sm sm:order-3">
         @if (auth.user(); as u) {
-          <span class="hidden text-slate-300 sm:inline">{{ u.firstName }} {{ u.lastName }}</span>
+          <span class="hidden items-center gap-2 whitespace-nowrap text-slate-200 sm:inline-flex">
+            <span class="inline-flex h-7 w-7 items-center justify-center rounded-full bg-indigo-500 text-xs font-semibold uppercase" aria-hidden="true">{{ u.firstName.charAt(0) }}</span>
+            {{ u.firstName }} {{ u.lastName }}
+          </span>
         }
         <button type="button" class="btn-ghost hidden whitespace-nowrap text-slate-400 lg:inline-flex"
           title="Ends your session on every device" (click)="logoutEverywhere()">Log out everywhere</button>
