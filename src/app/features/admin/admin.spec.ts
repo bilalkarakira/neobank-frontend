@@ -283,11 +283,17 @@ describe('Admin page', () => {
     activeOrders: 1,
     pausedOrders: 3,
   };
-  const openCustomer = (detail: CustomerDetail = DETAIL) => {
+  const TRAIL: AuditEntry[] = [
+    { id: 12, at: '2026-10-04T12:00:00Z', adminEmail: 'ada@example.com', action: 'FREEZE_ACCOUNT', accountIban: 'XX65NEOB1000000001', reason: 'Fraud report', detail: null },
+    { id: 11, at: '2026-10-03T12:00:00Z', adminEmail: 'ben@example.com', action: 'VIEW_CUSTOMER', accountIban: null, reason: null, detail: 'email=alice@example.com' },
+  ];
+  const openCustomer = (detail: CustomerDetail = DETAIL, trail: AuditEntry[] = []) => {
     openAccounts([account({ balance: '0.00' })]);
     (el.querySelector('button[aria-label="Open customer Alice Kim"]') as HTMLButtonElement).click();
     fixture.detectChanges();
     http.expectOne('/api/admin/customers/u-alice').flush(detail);
+    // the trail is asked for only after the detail: opening the customer writes its own audit row
+    http.expectOne('/api/admin/customers/u-alice/audit').flush(trail);
     fixture.detectChanges();
   };
 
@@ -306,6 +312,69 @@ describe('Admin page', () => {
     expect(text).toContain('Deposit');
     expect(text).toContain('-$25.00');
     expect(text).not.toContain('Locked out of login');
+  });
+
+  it('shows what administrators did about the customer, newest first, with who, what, which account and why', () => {
+    openCustomer(DETAIL, TRAIL);
+    const rows = [...el.querySelectorAll("table")].flatMap((t) =>
+      t.querySelector('caption')?.textContent?.includes('about this customer') ? [...t.querySelectorAll('tbody tr')] : [],
+    );
+    expect(rows.length).toBe(2);
+    expect(rows[0].textContent).toContain('ada@example.com');
+    expect(rows[0].textContent).toContain('Froze account');
+    expect(rows[0].textContent).toContain('XX65 NEOB 1000 0000 01');
+    expect(rows[0].textContent).toContain('Fraud report');
+    expect(rows[1].textContent).toContain('Viewed a customer');
+    expect(rows[1].textContent).toContain('ben@example.com');
+  });
+
+  it('ignores a late trail for a customer the administrator has already left', () => {
+    openAccounts([account(), account({ id: 'a9', ownerId: 'u-bob', ownerName: 'Bob Lee', ownerEmail: 'bob@example.com' })]);
+    (el.querySelector('button[aria-label="Open customer Alice Kim"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    http.expectOne('/api/admin/customers/u-alice').flush(DETAIL);
+    const lateForAlice = http.expectOne('/api/admin/customers/u-alice/audit'); // still in flight
+
+    click('Back to accounts');
+    (el.querySelector('button[aria-label="Open customer Bob Lee"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    http.expectOne('/api/admin/customers/u-bob').flush({ ...DETAIL, profile: { ...DETAIL.profile, id: 'u-bob', email: 'bob@example.com', firstName: 'Bob', lastName: 'Lee' } });
+    http.expectOne('/api/admin/customers/u-bob/audit').flush([]);
+    lateForAlice.flush(TRAIL); // arrives after Bob's
+    fixture.detectChanges();
+
+    expect(el.textContent).toContain('Nothing has been recorded about this customer yet.');
+    expect(el.textContent).not.toContain('Froze account');
+  });
+
+  it('says so when nothing was ever recorded about the customer', () => {
+    openCustomer(DETAIL, []);
+    expect(el.textContent).toContain('Nothing has been recorded about this customer yet.');
+  });
+
+  it('shows a retry for the trail alone, keeping the rest of the customer view', () => {
+    openAccounts([account({ balance: '0.00' })]);
+    (el.querySelector('button[aria-label="Open customer Alice Kim"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    http.expectOne('/api/admin/customers/u-alice').flush(DETAIL);
+    http.expectOne('/api/admin/customers/u-alice/audit').flush(null, { status: 500, statusText: 'Server Error' });
+    fixture.detectChanges();
+    expect(el.textContent).toContain("Could not load this customer's audit trail.");
+    expect(el.textContent).toContain('Alice Kim');
+
+    click('Try again');
+    http.expectOne('/api/admin/customers/u-alice/audit').flush(TRAIL);
+    fixture.detectChanges();
+    expect(el.textContent).not.toContain('Could not load');
+    expect(el.textContent).toContain('Froze account');
+  });
+
+  it('does not ask for the trail when the customer itself could not be loaded', () => {
+    openAccounts([account({ balance: '0.00' })]);
+    (el.querySelector('button[aria-label="Open customer Alice Kim"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    http.expectOne('/api/admin/customers/u-alice').flush(null, { status: 500, statusText: 'Server Error' });
+    http.expectNone('/api/admin/customers/u-alice/audit');
   });
 
   it('keeps the Accounts tab highlighted while a customer is open, and goes back without reloading the list', () => {
@@ -342,6 +411,7 @@ describe('Admin page', () => {
 
     click('Try again');
     http.expectOne('/api/admin/customers/u-alice').flush(DETAIL);
+    http.expectOne('/api/admin/customers/u-alice/audit').flush([]);
     fixture.detectChanges();
     expect(el.textContent).toContain('2 active session(s)');
   });
@@ -395,6 +465,7 @@ describe('Admin page', () => {
     const first = [...el.querySelectorAll('tbody tr')][0];
     expect(first.textContent).toContain('CLOSED');
     expect(first.querySelectorAll('button').length).toBe(0);
+    http.expectOne('/api/admin/customers/u-alice/audit').flush(TRAIL);
     http.expectOne((r) => r.url === '/api/admin/accounts').flush(pageOf([account({ status: 'CLOSED' })]));
     http.expectOne('/api/admin/overview').flush(OVERVIEW);
     http.expectOne('/api/admin/reconciliation').flush(HEALTHY);
@@ -412,6 +483,7 @@ describe('Admin page', () => {
 
     expect([...el.querySelectorAll('tbody tr')][0].textContent).toContain('FROZEN');
     expect(el.textContent).toContain('Unfreeze');
+    http.expectOne('/api/admin/customers/u-alice/audit').flush(TRAIL);
     http.expectOne((r) => r.url === '/api/admin/accounts').flush(pageOf([account({ status: 'FROZEN' })]));
     http.expectOne('/api/admin/overview').flush(OVERVIEW);
     http.expectOne('/api/admin/reconciliation').flush(HEALTHY);

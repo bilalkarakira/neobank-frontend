@@ -50,6 +50,11 @@ export class AdminService {
     return this.http.get<CustomerDetail>(`/api/admin/customers/${userId}`);
   }
 
+  /** What administrators have done about this customer; reading it is not audited. */
+  customerAudit(userId: string): Observable<AuditEntry[]> {
+    return this.http.get<AuditEntry[]>(`/api/admin/customers/${userId}/audit`);
+  }
+
   unfreeze(accountId: string, reason: string): Observable<void> {
     return this.http.post<void>(`/api/admin/accounts/${accountId}/unfreeze`, { reason });
   }

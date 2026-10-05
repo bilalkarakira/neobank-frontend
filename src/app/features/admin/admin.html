@@ -393,6 +393,51 @@
             </div>
           }
         </section>
+
+        <section class="mt-6" aria-labelledby="customer-trail-heading">
+          <h3 id="customer-trail-heading" class="font-semibold">What administrators did about this customer</h3>
+          @if (customerTrailFailed()) {
+            <p class="alert-error mt-2" role="alert">
+              Could not load this customer's audit trail.
+              <button type="button" class="font-medium underline" (click)="loadCustomerTrail(c.profile.id)">Try again</button>
+            </p>
+          } @else if (customerTrail(); as trail) {
+            @if (trail.length === 0) {
+              <p class="mt-2 text-sm text-slate-500">Nothing has been recorded about this customer yet.</p>
+            } @else {
+              <div class="mt-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <table class="w-full text-left text-sm">
+                  <caption class="sr-only">Administrator actions about this customer, newest first</caption>
+                  <thead class="text-xs uppercase tracking-wide text-slate-400">
+                    <tr>
+                      <th class="px-4 py-3 font-medium">When</th>
+                      <th class="px-4 py-3 font-medium">Who</th>
+                      <th class="px-4 py-3 font-medium">What</th>
+                      <th class="px-4 py-3 font-medium">Reason</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (entry of trail; track entry.id) {
+                      <tr class="border-t border-slate-100 align-top">
+                        <td class="whitespace-nowrap px-4 py-3">{{ entry.at | date: 'medium' }}</td>
+                        <td class="px-4 py-3">{{ entry.adminEmail }}</td>
+                        <td class="px-4 py-3">
+                          {{ actionLabel(entry.action) }}
+                          @if (entry.accountIban) {
+                            <span class="block font-mono text-xs text-slate-400">{{ formatIban(entry.accountIban) }}</span>
+                          }
+                        </td>
+                        <td class="px-4 py-3 text-slate-600">{{ entry.reason ?? '—' }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          } @else {
+            <p class="mt-2 text-sm text-slate-500">Loading…</p>
+          }
+        </section>
       } @else {
         <p class="mt-4 text-sm text-slate-500">Loading…</p>
       }

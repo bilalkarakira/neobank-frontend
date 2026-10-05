@@ -79,6 +79,13 @@ describe('AdminService', () => {
     req.flush(null);
   });
 
+  it('reads the audit trail of one customer', () => {
+    service.customerAudit('u-1').subscribe();
+    const req = http.expectOne('/api/admin/customers/u-1/audit');
+    expect(req.request.method).toBe('GET');
+    req.flush([]);
+  });
+
   it('triggers the jobs with POST and reads the audit log', () => {
     service.runInterest().subscribe();
     expect(http.expectOne('/api/admin/jobs/interest').request.method).toBe('POST');

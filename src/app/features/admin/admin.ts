@@ -72,6 +72,8 @@ export class Admin {
   // customer
   protected readonly customer = signal<CustomerDetail | null>(null);
   protected readonly customerFailed = signal(false);
+  protected readonly customerTrail = signal<AuditEntry[] | null>(null);
+  protected readonly customerTrailFailed = signal(false);
   private customerId: string | null = null;
 
   // security
@@ -251,6 +253,9 @@ export class Admin {
           this.loadAccounts(this.pageIndex());
         }
         this.audit.set(null);
+        if (this.customerId !== null && this.tab() === 'customer') {
+          this.loadCustomerTrail(this.customerId);
+        }
         this.loadOverview();
       },
       error: (err: unknown) => {
@@ -273,10 +278,25 @@ export class Admin {
     this.pending.set(null);
     this.customer.set(null);
     this.customerFailed.set(false);
+    this.customerTrail.set(null);
+    this.customerTrailFailed.set(false);
     this.customerId = userId;
     this.api.customer(userId).subscribe({
-      next: (detail) => this.customer.set(detail),
+      next: (detail) => {
+        this.customer.set(detail);
+        // after the detail: opening the customer writes its own audit row, which the trail should already show
+        this.loadCustomerTrail(userId);
+      },
       error: () => this.customerFailed.set(true),
+    });
+  }
+
+  protected loadCustomerTrail(userId: string): void {
+    this.customerTrailFailed.set(false);
+    this.api.customerAudit(userId).subscribe({
+      // an answer for a customer the admin has since left must not overwrite the one now on screen
+      next: (entries) => this.customerId === userId && this.customerTrail.set(entries),
+      error: () => this.customerId === userId && this.customerTrailFailed.set(true),
     });
   }
 
