@@ -5,6 +5,7 @@ import {
   AdminAccountPage,
   AdminAccountStatus,
   AuditEntry,
+  CustomerDetail,
   InterestRunSummary,
   Overview,
   Reconciliation,
@@ -37,6 +38,16 @@ export class AdminService {
 
   freeze(accountId: string, reason: string): Observable<void> {
     return this.http.post<void>(`/api/admin/accounts/${accountId}/freeze`, { reason });
+  }
+
+  /** Final, and only for an empty account (the server refuses otherwise). */
+  close(accountId: string, reason: string): Observable<void> {
+    return this.http.post<void>(`/api/admin/accounts/${accountId}/close`, { reason });
+  }
+
+  /** Opening a customer is recorded in the audit log by the server. */
+  customer(userId: string): Observable<CustomerDetail> {
+    return this.http.get<CustomerDetail>(`/api/admin/customers/${userId}`);
   }
 
   unfreeze(accountId: string, reason: string): Observable<void> {

@@ -34,6 +34,7 @@ export interface AdminAccount {
   ownerEmail: string;
   ownerName: string;
   createdAt: string;
+  ownerId: string;
 }
 
 export interface AdminAccountPage {
@@ -86,4 +87,43 @@ export interface SecuritySnapshot {
   /** Locks on addresses that belong to no customer: counted only, nobody is affected. */
   otherLockedAddresses: number;
   probingBlocks: ProbingBlock[];
+}
+
+export interface CustomerProfile {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  createdAt: string;
+}
+
+export interface CustomerAccount {
+  id: string;
+  iban: string;
+  type: 'CHECKING' | 'SAVINGS';
+  status: AdminAccountStatus;
+  nickname: string | null;
+  balance: string;
+  createdAt: string;
+}
+
+/** One ledger entry of one of the customer's accounts; the amount is signed (money out is negative). */
+export interface CustomerActivity {
+  at: string;
+  accountIban: string;
+  type: 'DEPOSIT' | 'TRANSFER' | 'INTEREST';
+  amount: string;
+  balanceAfter: string;
+  description: string | null;
+}
+
+export interface CustomerDetail {
+  profile: CustomerProfile;
+  accounts: CustomerAccount[];
+  recentActivity: CustomerActivity[];
+  activeSessions: number;
+  /** Null when the customer can log in. */
+  loginLockedUntil: string | null;
+  activeOrders: number;
+  pausedOrders: number;
 }

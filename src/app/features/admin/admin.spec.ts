@@ -2,7 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Admin } from './admin';
-import { AdminAccount, AdminAccountPage, AuditEntry, Overview, Reconciliation, SecuritySnapshot } from './admin.models';
+import { AdminAccount, AdminAccountPage, AuditEntry, CustomerDetail, Overview, Reconciliation, SecuritySnapshot } from './admin.models';
 
 const OVERVIEW: Overview = {
   generatedAt: '2026-10-04T12:00:00Z',
@@ -31,6 +31,7 @@ const account = (overrides: Partial<AdminAccount> = {}): AdminAccount => ({
   ownerEmail: 'alice@example.com',
   ownerName: 'Alice Kim',
   createdAt: '2026-10-01T10:00:00Z',
+  ownerId: 'u-alice',
   ...overrides,
 });
 const pageOf = (items: AdminAccount[], total = items.length, page = 0): AdminAccountPage => ({
@@ -262,6 +263,190 @@ describe('Admin page', () => {
     );
     fixture.detectChanges();
     expect(el.textContent).toContain('The account is ACTIVE, so it cannot be unfrozen.');
+  });
+
+  // ---- customer detail and closing accounts ----------------------------------------------------------------
+
+  const DETAIL: CustomerDetail = {
+    profile: { id: 'u-alice', firstName: 'Alice', lastName: 'Kim', email: 'alice@example.com', createdAt: '2026-09-01T10:00:00Z' },
+    accounts: [
+      { id: 'a1', iban: 'XX65NEOB1000000001', type: 'CHECKING', status: 'ACTIVE', nickname: 'Daily', balance: '0.00', createdAt: '2026-09-01T10:00:00Z' },
+      { id: 'a2', iban: 'XX38NEOB1000000002', type: 'SAVINGS', status: 'ACTIVE', nickname: null, balance: '120.50', createdAt: '2026-09-02T10:00:00Z' },
+      { id: 'a3', iban: 'XX11NEOB1000000003', type: 'CHECKING', status: 'CLOSED', nickname: 'Old', balance: '0.00', createdAt: '2026-08-01T10:00:00Z' },
+    ],
+    recentActivity: [
+      { at: '2026-10-04T12:00:00Z', accountIban: 'XX65NEOB1000000001', type: 'TRANSFER', amount: '-25.00', balanceAfter: '0.00', description: 'Gym' },
+      { at: '2026-10-03T12:00:00Z', accountIban: 'XX65NEOB1000000001', type: 'DEPOSIT', amount: '25.00', balanceAfter: '25.00', description: null },
+    ],
+    activeSessions: 2,
+    loginLockedUntil: null,
+    activeOrders: 1,
+    pausedOrders: 3,
+  };
+  const openCustomer = (detail: CustomerDetail = DETAIL) => {
+    openAccounts([account({ balance: '0.00' })]);
+    (el.querySelector('button[aria-label="Open customer Alice Kim"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    http.expectOne('/api/admin/customers/u-alice').flush(detail);
+    fixture.detectChanges();
+  };
+
+  it('opens a customer from the owner name in the account list', () => {
+    openCustomer();
+    const text = el.textContent ?? '';
+    expect(text).toContain('Alice Kim');
+    expect(text).toContain('alice@example.com · customer since Sep 1, 2026');
+    expect(text).toContain('2 active session(s)');
+    expect(text).toContain('1 active and 3 paused recurring payment(s)');
+    expect(text).toContain('Opening this page is recorded in the audit log.');
+    expect(text).toContain('XX65 NEOB 1000 0000 01');
+    expect(text).toContain('$120.50');
+    expect(text).toContain('Gym');
+    expect(text).toContain('Transfer');
+    expect(text).toContain('Deposit');
+    expect(text).toContain('-$25.00');
+    expect(text).not.toContain('Locked out of login');
+  });
+
+  it('keeps the Accounts tab highlighted while a customer is open, and goes back without reloading the list', () => {
+    openCustomer();
+    expect(el.querySelector('[role=tab][aria-selected=true]')?.textContent?.trim()).toBe('Accounts');
+
+    click('← Back to accounts');
+
+    http.expectNone((r) => r.url === '/api/admin/accounts'); // the list is still there
+    expect(el.textContent).toContain('Customer accounts');
+  });
+
+  it('shows a login lock with a way to the security tab', () => {
+    openCustomer({ ...DETAIL, loginLockedUntil: '2026-10-05T12:15:00Z' });
+    expect(el.textContent).toContain('Locked out of login until');
+    click('Review');
+    http.expectOne('/api/admin/security').flush({ lockedLogins: [], otherLockedAddresses: 0, probingBlocks: [] });
+    fixture.detectChanges();
+    expect(el.textContent).toContain('Locked out of login');
+  });
+
+  it('says so when a customer has no accounts or no activity', () => {
+    openCustomer({ ...DETAIL, accounts: [], recentActivity: [] });
+    expect(el.textContent).toContain('This customer has no accounts.');
+    expect(el.textContent).toContain('Nothing has happened on these accounts yet.');
+  });
+
+  it('offers a retry when the customer cannot be loaded', () => {
+    openAccounts([account()]);
+    (el.querySelector('button[aria-label="Open customer Alice Kim"]') as HTMLButtonElement).click();
+    http.expectOne('/api/admin/customers/u-alice').flush(null, { status: 500, statusText: 'Server Error' });
+    fixture.detectChanges();
+    expect(el.textContent).toContain('Could not load this customer.');
+
+    click('Try again');
+    http.expectOne('/api/admin/customers/u-alice').flush(DETAIL);
+    fixture.detectChanges();
+    expect(el.textContent).toContain('2 active session(s)');
+  });
+
+  it('only lets an empty account be closed, and offers nothing at all on a closed one', () => {
+    openCustomer();
+    const rows = [...el.querySelectorAll('tbody tr')];
+    const closeOf = (row: Element) => [...row.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Close');
+    expect(closeOf(rows[0])?.disabled).toBe(false);                      // 0.00: can be closed
+    expect(closeOf(rows[1])?.disabled).toBe(true);                       // 120.50: the money has to be moved first
+    expect(closeOf(rows[1])?.title).toBe('Only an empty account can be closed');
+    expect(closeOf(rows[2])).toBeUndefined();                            // already closed
+    expect(rows[2].querySelectorAll('button').length).toBe(0);
+  });
+
+  it('closes an account from the account list: a stern warning, a reason, then the list and figures are reloaded', () => {
+    openAccounts([account({ balance: '0.00' })]);
+    click('Close');
+    expect(el.textContent).toContain('This cannot be undone.');
+    expect(el.textContent).toContain('recurring payments will be cancelled');
+    click('Close account for good');
+    http.expectNone('/api/admin/accounts/a1/close'); // no reason yet
+    expect(el.textContent).toContain('A reason is required.');
+
+    set('reason', ' Customer asked to close it ');
+    click('Close account for good');
+    const req = http.expectOne('/api/admin/accounts/a1/close');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ reason: 'Customer asked to close it' });
+    req.flush(null, { status: 204, statusText: 'No Content' });
+    fixture.detectChanges();
+
+    expect(el.textContent).toContain('closed.');
+    http.expectOne((r) => r.url === '/api/admin/accounts').flush(pageOf([account({ status: 'CLOSED' })]));
+    http.expectOne('/api/admin/overview').flush(OVERVIEW);
+    http.expectOne('/api/admin/reconciliation').flush(HEALTHY);
+  });
+
+  it('closes an account from the customer view and updates it in place without another audited view', () => {
+    openCustomer();
+    const row = [...el.querySelectorAll('tbody tr')][0];
+    [...row.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Close')!.click();
+    fixture.detectChanges();
+    expect(el.textContent).toContain('Close XX65 NEOB 1000 0000 01 (alice@example.com)?');
+    set('reason', 'Customer asked');
+    click('Close account for good');
+    http.expectOne('/api/admin/accounts/a1/close').flush(null, { status: 204, statusText: 'No Content' });
+    fixture.detectChanges();
+
+    http.expectNone('/api/admin/customers/u-alice'); // re-fetching would write another "viewed" line to the audit log
+    const first = [...el.querySelectorAll('tbody tr')][0];
+    expect(first.textContent).toContain('CLOSED');
+    expect(first.querySelectorAll('button').length).toBe(0);
+    http.expectOne((r) => r.url === '/api/admin/accounts').flush(pageOf([account({ status: 'CLOSED' })]));
+    http.expectOne('/api/admin/overview').flush(OVERVIEW);
+    http.expectOne('/api/admin/reconciliation').flush(HEALTHY);
+  });
+
+  it('freezes from the customer view and shows the new status in place', () => {
+    openCustomer();
+    const row = [...el.querySelectorAll('tbody tr')][0];
+    [...row.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Freeze')!.click();
+    fixture.detectChanges();
+    set('reason', 'Fraud report');
+    click('Freeze account');
+    http.expectOne('/api/admin/accounts/a1/freeze').flush(null, { status: 204, statusText: 'No Content' });
+    fixture.detectChanges();
+
+    expect([...el.querySelectorAll('tbody tr')][0].textContent).toContain('FROZEN');
+    expect(el.textContent).toContain('Unfreeze');
+    http.expectOne((r) => r.url === '/api/admin/accounts').flush(pageOf([account({ status: 'FROZEN' })]));
+    http.expectOne('/api/admin/overview').flush(OVERVIEW);
+    http.expectOne('/api/admin/reconciliation').flush(HEALTHY);
+  });
+
+  it('shows the server\'s explanation when closing is refused because money is left', () => {
+    openCustomer({ ...DETAIL, accounts: [{ ...DETAIL.accounts[0], balance: '0.00' }] });
+    const row = [...el.querySelectorAll('tbody tr')][0];
+    [...row.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Close')!.click();
+    fixture.detectChanges();
+    set('reason', 'Customer asked');
+    click('Close account for good');
+    http.expectOne('/api/admin/accounts/a1/close').flush(
+      { code: 'ADMIN_ACCOUNT_NOT_EMPTY', detail: 'The account still holds 0.01. It can only be closed when the balance is exactly 0.00.' },
+      { status: 422, statusText: 'Unprocessable Entity' },
+    );
+    fixture.detectChanges();
+
+    expect(el.textContent).toContain('The account still holds 0.01.');
+    expect([...el.querySelectorAll('tbody tr')][0].textContent).toContain('ACTIVE'); // not shown as closed
+  });
+
+  it('describes the new audit actions in plain language', () => {
+    loadOverview();
+    click('Audit log');
+    http.expectOne('/api/admin/audit').flush([
+      { id: 2, at: '2026-10-05T12:00:00Z', adminEmail: 'ada@example.com', action: 'CLOSE_ACCOUNT', accountIban: 'XX65NEOB1000000001', reason: 'Asked', detail: 'cancelledOrders=2' },
+      { id: 1, at: '2026-10-05T11:00:00Z', adminEmail: 'ada@example.com', action: 'VIEW_CUSTOMER', accountIban: null, reason: null, detail: 'email=alice@example.com' },
+    ]);
+    fixture.detectChanges();
+    const text = el.textContent ?? '';
+    expect(text).toContain('Closed account');
+    expect(text).toContain('Viewed a customer');
+    expect(text).toContain('cancelledOrders=2');
+    expect(text).not.toContain('VIEW_CUSTOMER');
   });
 
   // ---- security ---------------------------------------------------------------------------------------------

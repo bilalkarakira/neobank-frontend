@@ -1,4 +1,4 @@
-import { CurrencyPipe, DatePipe } from '@angular/common';
+import { CurrencyPipe, DatePipe, NgTemplateOutlet } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -10,6 +10,8 @@ import {
   AdminAccount,
   AdminAccountPage,
   AdminAccountStatus,
+  CustomerAccount,
+  CustomerDetail,
   AuditEntry,
   Overview,
   Reconciliation,
@@ -17,8 +19,10 @@ import {
 } from './admin.models';
 import { AdminService } from './admin.service';
 
-type Tab = 'overview' | 'accounts' | 'security' | 'audit';
-type Pending = { account: AdminAccount; kind: 'freeze' | 'unfreeze' };
+type Tab = 'overview' | 'accounts' | 'customer' | 'security' | 'audit';
+/** What an action on an account needs to show: enough to name it, whichever list it was picked from. */
+type Target = { id: string; iban: string; ownerEmail: string };
+type Pending = { account: Target; kind: 'freeze' | 'unfreeze' | 'close' };
 type PendingSecurity =
   | { kind: 'login'; email: string }
   | { kind: 'probing'; userId: string; email: string };
@@ -32,11 +36,13 @@ const ACTION_LABELS: Record<string, string> = {
   RUN_RECURRING: 'Ran recurring payments',
   UNLOCK_LOGIN: 'Unlocked a login',
   CLEAR_PROBING_BLOCK: 'Lifted a probing block',
+  CLOSE_ACCOUNT: 'Closed account',
+  VIEW_CUSTOMER: 'Viewed a customer',
 };
 
 @Component({
   selector: 'app-admin',
-  imports: [ReactiveFormsModule, CurrencyPipe, DatePipe],
+  imports: [ReactiveFormsModule, CurrencyPipe, DatePipe, NgTemplateOutlet],
   templateUrl: './admin.html',
 })
 export class Admin {
@@ -62,6 +68,11 @@ export class Admin {
   protected readonly pending = signal<Pending | null>(null);
   protected readonly reason = this.fb.control('', [Validators.required, Validators.maxLength(200)]);
   protected readonly acting = signal(false);
+
+  // customer
+  protected readonly customer = signal<CustomerDetail | null>(null);
+  protected readonly customerFailed = signal(false);
+  private customerId: string | null = null;
 
   // security
   protected readonly security = signal<SecuritySnapshot | null>(null);
@@ -195,10 +206,20 @@ export class Admin {
     }
   }
 
-  protected ask(account: AdminAccount, kind: 'freeze' | 'unfreeze'): void {
+  protected ask(account: Target, kind: 'freeze' | 'unfreeze' | 'close'): void {
     this.reason.reset('');
     this.error.set(null);
     this.pending.set({ account, kind });
+  }
+
+  /** From the customer view: the account knows its owner through the customer being shown. */
+  protected askAboutCustomerAccount(account: CustomerAccount, kind: 'freeze' | 'unfreeze' | 'close'): void {
+    this.ask({ id: account.id, iban: account.iban, ownerEmail: this.customer()?.profile.email ?? '' }, kind);
+  }
+
+  /** Only an account holding exactly nothing can be closed; the server enforces it, this just avoids a pointless click. */
+  protected canClose(balance: string): boolean {
+    return Number(balance) === 0;
   }
 
   protected confirm(): void {
@@ -208,16 +229,27 @@ export class Admin {
       return;
     }
     this.acting.set(true);
+    const reason = this.reason.value.trim();
     const request =
       pending.kind === 'freeze'
-        ? this.api.freeze(pending.account.id, this.reason.value.trim())
-        : this.api.unfreeze(pending.account.id, this.reason.value.trim());
+        ? this.api.freeze(pending.account.id, reason)
+        : pending.kind === 'close'
+          ? this.api.close(pending.account.id, reason)
+          : this.api.unfreeze(pending.account.id, reason);
+    const newStatus = pending.kind === 'freeze' ? 'FROZEN' : pending.kind === 'close' ? 'CLOSED' : 'ACTIVE';
     request.subscribe({
       next: () => {
         this.acting.set(false);
         this.pending.set(null);
-        this.notice.set(`Account ${formatIban(pending.account.iban)} ${pending.kind === 'freeze' ? 'frozen' : 'unfrozen'}.`);
-        this.loadAccounts(this.pageIndex());
+        const verb = pending.kind === 'freeze' ? 'frozen' : pending.kind === 'close' ? 'closed' : 'unfrozen';
+        this.notice.set(`Account ${formatIban(pending.account.iban)} ${verb}.`);
+        // the customer view is patched in place: re-fetching it would write another "viewed" line to the audit log
+        this.customer.update((c) =>
+          c ? { ...c, accounts: c.accounts.map((a) => (a.id === pending.account.id ? { ...a, status: newStatus } : a)) } : c,
+        );
+        if (this.page() !== null) {
+          this.loadAccounts(this.pageIndex());
+        }
         this.audit.set(null);
         this.loadOverview();
       },
@@ -230,6 +262,42 @@ export class Admin {
 
   protected cancelPending(): void {
     this.pending.set(null);
+  }
+
+  // ---- customer ---------------------------------------------------------------------------------------------
+
+  protected openCustomer(userId: string): void {
+    this.tab.set('customer');
+    this.notice.set(null);
+    this.error.set(null);
+    this.pending.set(null);
+    this.customer.set(null);
+    this.customerFailed.set(false);
+    this.customerId = userId;
+    this.api.customer(userId).subscribe({
+      next: (detail) => this.customer.set(detail),
+      error: () => this.customerFailed.set(true),
+    });
+  }
+
+  protected retryCustomer(): void {
+    if (this.customerId) {
+      this.openCustomer(this.customerId);
+    }
+  }
+
+  protected backToAccounts(): void {
+    this.pending.set(null);
+    this.show('accounts');
+  }
+
+  /** The customer view belongs to the Accounts section, so that tab stays highlighted while it is open. */
+  protected isTab(name: string): boolean {
+    return this.tab() === name || (name === 'accounts' && this.tab() === 'customer');
+  }
+
+  protected activityLabel(type: string): string {
+    return type === 'DEPOSIT' ? 'Deposit' : type === 'INTEREST' ? 'Interest' : 'Transfer';
   }
 
   // ---- security ---------------------------------------------------------------------------------------------
@@ -304,6 +372,12 @@ export class Admin {
       const problem = err.error as ApiProblem | null;
       if (problem?.code === 'ADMIN_INVALID_STATE' && problem.detail) {
         return problem.detail;
+      }
+      if (problem?.code === 'ADMIN_ACCOUNT_NOT_EMPTY' && problem.detail) {
+        return problem.detail;
+      }
+      if (problem?.code === 'CUSTOMER_NOT_FOUND') {
+        return 'This customer no longer exists.';
       }
       if (problem?.code === 'NOT_LOCKED') {
         return 'That customer is no longer locked out.';

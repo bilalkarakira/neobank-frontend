@@ -68,6 +68,17 @@ describe('AdminService', () => {
     clear.flush(null);
   });
 
+  it('reads a customer and closes an account with a reason in the body', () => {
+    service.customer('u-1').subscribe();
+    expect(http.expectOne('/api/admin/customers/u-1').request.method).toBe('GET');
+
+    service.close('a-1', 'Customer asked').subscribe();
+    const req = http.expectOne('/api/admin/accounts/a-1/close');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ reason: 'Customer asked' });
+    req.flush(null);
+  });
+
   it('triggers the jobs with POST and reads the audit log', () => {
     service.runInterest().subscribe();
     expect(http.expectOne('/api/admin/jobs/interest').request.method).toBe('POST');
