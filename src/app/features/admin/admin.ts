@@ -13,13 +13,15 @@ import {
   CustomerAccount,
   CustomerDetail,
   AuditEntry,
+  CardAuthStatus,
+  CardAuthorizationPage,
   Overview,
   Reconciliation,
   SecuritySnapshot,
 } from './admin.models';
 import { AdminService } from './admin.service';
 
-type Tab = 'overview' | 'accounts' | 'customer' | 'security' | 'audit';
+type Tab = 'overview' | 'accounts' | 'customer' | 'security' | 'cards' | 'audit';
 /** What an action on an account needs to show: enough to name it, whichever list it was picked from. */
 type Target = { id: string; iban: string; ownerEmail: string };
 type Pending = { account: Target; kind: 'freeze' | 'unfreeze' | 'close' };
@@ -83,9 +85,23 @@ export class Admin {
   protected readonly securityReason = this.fb.control('', [Validators.required, Validators.maxLength(200)]);
   protected readonly securityActing = signal(false);
 
+  // card authorizations
+  protected readonly cardPage = signal<CardAuthorizationPage | null>(null);
+  protected readonly cardsFailed = signal(false);
+  protected readonly cardPageIndex = signal(0);
+  protected readonly cardFilters = this.fb.group({
+    status: this.fb.control<CardAuthStatus | ''>(''),
+    last4: ['', Validators.pattern(/^\d{4}$/)],
+  });
+
   // audit
   protected readonly audit = signal<AuditEntry[] | null>(null);
   protected readonly auditFailed = signal(false);
+
+  protected readonly cardPageCount = computed(() => {
+    const p = this.cardPage();
+    return p ? Math.max(1, Math.ceil(p.total / p.size)) : 1;
+  });
 
   protected readonly pageCount = computed(() => {
     const p = this.page();
@@ -98,6 +114,14 @@ export class Admin {
     merge(this.filters.controls.q.valueChanges.pipe(debounceTime(300)), this.filters.controls.status.valueChanges)
       .pipe(takeUntilDestroyed())
       .subscribe(() => this.loadAccounts(0));
+    // the card list reloads on a status change at once, and on four typed digits (or none) after a pause
+    merge(this.cardFilters.controls.status.valueChanges, this.cardFilters.controls.last4.valueChanges.pipe(debounceTime(300)))
+      .pipe(takeUntilDestroyed())
+      .subscribe(() => {
+        if (this.cardFilters.controls.last4.valid || this.cardFilters.controls.last4.value === '') {
+          this.loadCardAuthorizations(0);
+        }
+      });
   }
 
   protected show(tab: Tab): void {
@@ -110,6 +134,9 @@ export class Admin {
     if (tab === 'security') {
       this.pendingSecurity.set(null);
       this.loadSecurity();
+    }
+    if (tab === 'cards') {
+      this.loadCardAuthorizations(0);
     }
     if (tab === 'audit') {
       this.loadAudit();
@@ -182,6 +209,22 @@ export class Admin {
   private failJob(err: unknown): void {
     this.jobBusy.set(null);
     this.error.set(this.messageFor(err));
+  }
+
+  // ---- card authorizations ----------------------------------------------------------------------------------
+
+  protected loadCardAuthorizations(index: number): void {
+    this.cardsFailed.set(false);
+    this.cardPageIndex.set(index);
+    const { status, last4 } = this.cardFilters.getRawValue();
+    this.api.cardAuthorizations(status, last4, index, PAGE_SIZE).subscribe({
+      next: (p) => this.cardPage.set(p),
+      error: () => this.cardsFailed.set(true),
+    });
+  }
+
+  protected cardStatusLabel(status: CardAuthStatus): string {
+    return { AUTHORIZED: 'Pending hold', DECLINED: 'Declined', REVERSED: 'Reversed', EXPIRED: 'Expired', CAPTURED: 'Posted' }[status];
   }
 
   // ---- accounts ---------------------------------------------------------------------------------------------

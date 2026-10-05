@@ -14,6 +14,8 @@ const account = (overrides: Partial<Account>): Account => ({
   status: 'ACTIVE',
   nickname: 'Daily',
   balance: '500.00',
+  availableBalance: overrides.balance ?? '500.00',
+  heldAmount: '0.00',
   createdAt: '2026-10-04T10:00:00Z',
   ...overrides,
 });
@@ -341,4 +343,40 @@ describe('Transfer page', () => {
     expect(el.textContent).not.toContain('The transfer was rejected');
     expect(button('Confirm transfer').disabled).toBe(false);
   });
+
+  it('offers the available balance of each account, not the balance', () => {
+    loadData([account({ id: 'a', balance: '500.00', availableBalance: '400.00', heldAmount: '100.00' }), SAVINGS]);
+    const option = [...field('fromId').querySelectorAll('option')].map((o) => o.textContent?.replace(/\s+/g, ' ').trim());
+    expect(option[0]).toContain('$400.00 available');
+    expect(option[0]).not.toContain('$500.00');
+  });
+
+  it('warns against the available balance and names the reserved money', () => {
+    loadData([account({ id: 'a', balance: '500.00', availableBalance: '400.00', heldAmount: '100.00' }), SAVINGS]);
+    set('toOwnId', 'b');
+
+    set('amount', '450');
+    expect(el.textContent).toContain('more than the available balance');
+    expect(el.textContent).toContain('100.00 USD is reserved for card payments');
+    expect(button('Review transfer').disabled).toBe(true);
+
+    set('amount', '400');
+    expect(el.textContent).not.toContain('more than the available balance');
+    expect(button('Review transfer').disabled).toBe(false);
+  });
+
+  it('explains an insufficient-funds refusal when card payments hold part of the money', () => {
+    loadData([account({ id: 'a', balance: '500.00', availableBalance: '400.00', heldAmount: '100.00' }), SAVINGS]);
+    set('toOwnId', 'b');
+    set('amount', '10');
+    button('Review transfer').click();
+    fixture.detectChanges();
+
+    button('Confirm transfer').click();
+    transferRequest().flush({ code: 'INSUFFICIENT_FUNDS' }, { status: 422, statusText: 'Unprocessable' });
+    fixture.detectChanges();
+
+    expect(el.textContent).toContain('Money reserved for card payments cannot be sent');
+  });
+
 });

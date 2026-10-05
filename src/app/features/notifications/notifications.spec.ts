@@ -114,4 +114,16 @@ describe('Notifications page', () => {
     load();
     expect(el.querySelectorAll('li').length).toBe(3);
   });
+
+  it('shows the notice of a card frozen after wrong PINs', () => {
+    http.expectOne('/api/notifications').flush({
+      unreadCount: 1,
+      items: [item({ id: 'n-9', kind: 'CARD_FROZEN_PIN', title: 'Your card was frozen', body: 'Frozen after wrong PINs.' })],
+    });
+    fixture.detectChanges();
+
+    expect(el.textContent).toContain('Your card was frozen');
+    expect(el.textContent).toContain('Card ·');
+  });
+
 });

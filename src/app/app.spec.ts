@@ -156,4 +156,12 @@ describe('App', () => {
     expect(TestBed.inject(AuthService).isLoggedIn()).toBe(true);
     expect(navigate).not.toHaveBeenCalled();
   });
+
+  it('has a Cards link for customers', () => {
+    const fixture = loggedInApp('CUSTOMER');
+    const links = [...(fixture.nativeElement as HTMLElement).querySelectorAll('a')].filter((a) => a.getAttribute('href') === '/cards');
+    expect(links.length).toBeGreaterThan(0);
+    expect(links[0].textContent).toContain('Cards');
+  });
+
 });

@@ -1,4 +1,4 @@
-export type NotificationKind = 'NEW_DEVICE_LOGIN' | 'LOGIN_LOCKED' | 'PASSWORD_CHANGED';
+export type NotificationKind = 'NEW_DEVICE_LOGIN' | 'LOGIN_LOCKED' | 'PASSWORD_CHANGED' | 'CARD_FROZEN_PIN';
 
 export interface NotificationItem {
   id: string;

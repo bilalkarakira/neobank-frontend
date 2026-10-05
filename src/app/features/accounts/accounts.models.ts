@@ -9,6 +9,10 @@ export interface Account {
   nickname: string | null;
   /** Decimal string such as "0.00"; never parsed for arithmetic on the client. */
   balance: string;
+  /** Balance minus money reserved by pending card payments: what can actually be spent. */
+  availableBalance: string;
+  /** Reserved by pending card payments (decimal string, "0.00" when nothing is held). */
+  heldAmount: string;
   createdAt: string;
   /** Yearly rate (APY) as a percentage like "3.50"; only savings accounts have one. */
   interestRate?: string | null;

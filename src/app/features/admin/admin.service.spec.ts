@@ -94,4 +94,22 @@ describe('AdminService', () => {
     service.audit().subscribe();
     expect(http.expectOne('/api/admin/audit').request.method).toBe('GET');
   });
+
+  it('asks for card authorizations with only the filters that are set', () => {
+    service.cardAuthorizations('', '', 0, 20).subscribe();
+    const plain = http.expectOne((r) => r.url === '/api/admin/authorizations');
+    expect(plain.request.method).toBe('GET');
+    expect(plain.request.params.get('page')).toBe('0');
+    expect(plain.request.params.get('size')).toBe('20');
+    expect(plain.request.params.has('status')).toBe(false);
+    expect(plain.request.params.has('last4')).toBe(false);
+    plain.flush({ items: [], total: 0, page: 0, size: 20 });
+
+    service.cardAuthorizations('DECLINED', ' 0012 ', 2, 20).subscribe();
+    const filtered = http.expectOne((r) => r.url === '/api/admin/authorizations');
+    expect(filtered.request.params.get('status')).toBe('DECLINED');
+    expect(filtered.request.params.get('last4')).toBe('0012');
+    expect(filtered.request.params.get('page')).toBe('2');
+    filtered.flush({ items: [], total: 0, page: 2, size: 20 });
+  });
 });

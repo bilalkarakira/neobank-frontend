@@ -60,6 +60,11 @@ export class Accounts {
     return String(Number(account.interestRate));
   }
 
+  /** True when pending card payments reserve part of the balance. */
+  protected hasHolds(account: Account): boolean {
+    return Number(account.heldAmount) > 0;
+  }
+
   protected amountOf(value: string): number {
     return Number(value);
   }

@@ -13,6 +13,8 @@ const account = (overrides: Partial<Account> = {}): Account => ({
   status: 'ACTIVE',
   nickname: null,
   balance: '1250.50',
+  availableBalance: overrides.balance ?? '1250.50',
+  heldAmount: '0.00',
   createdAt: '2026-10-04T10:00:00Z',
   ...overrides,
 });
@@ -197,4 +199,23 @@ describe('Accounts', () => {
     expect(el.querySelector('form [role=alert]')?.textContent).toContain('at most 1 open checking account');
     expect(el.querySelectorAll('li').length).toBe(1);
   });
+
+  it('says how much is available when pending card payments reserve part of the balance', () => {
+    const fixture = render();
+    http.expectOne('/api/accounts').flush([account({ balance: '200.00', availableBalance: '154.75', heldAmount: '45.25' })]);
+    fixture.detectChanges();
+
+    const note = (fixture.nativeElement as HTMLElement).querySelector('[data-testid=held-note]')?.textContent?.replace(/\s+/g, ' ');
+    expect(note).toContain('$154.75 available');
+    expect(note).toContain('$45.25 reserved for card payments');
+  });
+
+  it('shows no reservation note when nothing is reserved', () => {
+    const fixture = render();
+    http.expectOne('/api/accounts').flush([account()]);
+    fixture.detectChanges();
+
+    expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid=held-note]')).toBeNull();
+  });
+
 });

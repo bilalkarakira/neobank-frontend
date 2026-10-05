@@ -27,8 +27,8 @@ vi.mock('chart.js', () => {
 const charts = () => (Chart as unknown as { instances: { config: { type: string } }[] }).instances;
 
 const ACCOUNTS: Account[] = [
-  { id: 'a', iban: 'XX65NEOB1000000001', type: 'CHECKING', currency: 'USD', status: 'ACTIVE', nickname: 'Daily', balance: '0', createdAt: '' },
-  { id: 'b', iban: 'XX38NEOB1000000002', type: 'SAVINGS', currency: 'USD', status: 'ACTIVE', nickname: 'Holiday', balance: '0', createdAt: '' },
+  { id: 'a', iban: 'XX65NEOB1000000001', type: 'CHECKING', currency: 'USD', status: 'ACTIVE', nickname: 'Daily', balance: '0', availableBalance: '0', heldAmount: '0.00', createdAt: '' },
+  { id: 'b', iban: 'XX38NEOB1000000002', type: 'SAVINGS', currency: 'USD', status: 'ACTIVE', nickname: 'Holiday', balance: '0', availableBalance: '0', heldAmount: '0.00', createdAt: '' },
 ];
 const SUMMARY: Summary = {
   currency: 'USD',

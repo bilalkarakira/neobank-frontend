@@ -24,7 +24,7 @@
                 @for (account of list; track account.id) {
                   @if (account.status === 'ACTIVE') {
                     <option [value]="account.id">
-                      {{ title(account) }} · {{ amountNumber(account.balance) | currency: account.currency }}
+                      {{ title(account) }} · {{ amountNumber(account.availableBalance) | currency: account.currency }} available
                     </option>
                   }
                 }

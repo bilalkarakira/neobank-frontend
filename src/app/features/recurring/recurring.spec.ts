@@ -14,6 +14,8 @@ const account = (overrides: Partial<Account>): Account => ({
   status: 'ACTIVE',
   nickname: 'Daily',
   balance: '500.00',
+  availableBalance: overrides.balance ?? '500.00',
+  heldAmount: '0.00',
   createdAt: '2026-10-04T10:00:00Z',
   ...overrides,
 });

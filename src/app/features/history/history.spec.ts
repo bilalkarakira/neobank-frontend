@@ -9,7 +9,7 @@ import { History } from './history';
 import { HistoryPage, TransactionItem } from './history.models';
 
 const account = (id: string, nickname: string, iban: string): Account => ({
-  id, iban, nickname, type: 'CHECKING', currency: 'USD', status: 'ACTIVE', balance: '0.00', createdAt: '',
+  id, iban, nickname, type: 'CHECKING', currency: 'USD', status: 'ACTIVE', balance: '0.00', availableBalance: '0.00', heldAmount: '0.00', createdAt: '',
 });
 const ACCOUNTS = [account('a', 'Daily', 'XX65NEOB1000000001'), account('b', 'Holiday', 'XX38NEOB1000000002')];
 

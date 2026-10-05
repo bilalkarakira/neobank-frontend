@@ -150,8 +150,10 @@ export class Transfer {
     }
     const amount = Number(text);
     const source = this.source();
-    if (source && amount > Number(source.balance)) {
-      return 'This is more than the balance of the selected account.';
+    if (source && amount > Number(source.availableBalance)) {
+      return Number(source.heldAmount) > 0
+        ? `This is more than the available balance of the selected account: ${source.heldAmount} USD is reserved for card payments.`
+        : 'This is more than the balance of the selected account.';
     }
     const limits = this.limits();
     if (this.sendingToOthers() && limits && amount > Number(limits.remaining)) {
@@ -222,7 +224,9 @@ export class Transfer {
       const problem = err.error as (ApiProblem & { remaining?: string }) | null;
       switch (problem?.code) {
         case 'INSUFFICIENT_FUNDS':
-          return 'Insufficient funds in the selected account.';
+          return Number(this.source()?.heldAmount) > 0
+            ? 'Insufficient available funds in the selected account. Money reserved for card payments cannot be sent.'
+            : 'Insufficient funds in the selected account.';
         case 'DAILY_LIMIT_EXCEEDED':
           return problem.detail ?? 'This would exceed your daily transfer limit.';
         case 'RECIPIENT_UNAVAILABLE':

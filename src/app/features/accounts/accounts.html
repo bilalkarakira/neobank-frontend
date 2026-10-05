@@ -66,6 +66,13 @@
               {{ amount(account) | currency: account.currency }}
             </p>
 
+            @if (hasHolds(account)) {
+              <p class="mt-1 text-xs text-slate-500" data-testid="held-note">
+                <span class="font-medium text-slate-700">{{ amountOf(account.availableBalance) | currency: account.currency }} available</span>
+                · {{ amountOf(account.heldAmount) | currency: account.currency }} reserved for card payments
+              </p>
+            }
+
             @if (earned()[account.id]; as interest) {
               <p class="mt-1 text-xs text-slate-500">Interest earned this year: <span class="font-medium text-slate-700">{{ amountOf(interest) | currency: account.currency }}</span></p>
             }

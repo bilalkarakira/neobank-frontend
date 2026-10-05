@@ -18,6 +18,7 @@ const ICONS = {
     'M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z',
   admin:
     'M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75',
+  card: 'M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z',
   more: 'M6.75 12a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0ZM12.75 12a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0ZM18.75 12a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z',
   logout:
     'M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9',
@@ -31,6 +32,7 @@ interface NavItem {
 
 const DASHBOARD: NavItem = { path: '/dashboard', label: 'Dashboard', icon: ICONS.home };
 const ACCOUNTS: NavItem = { path: '/home', label: 'Accounts', icon: ICONS.wallet };
+const CARDS: NavItem = { path: '/cards', label: 'Cards', icon: ICONS.card };
 const SEND: NavItem = { path: '/transfer', label: 'Send money', icon: ICONS.send };
 const RECURRING: NavItem = { path: '/recurring', label: 'Recurring', icon: ICONS.repeat };
 const HISTORY: NavItem = { path: '/history', label: 'History', icon: ICONS.clock };
@@ -47,10 +49,11 @@ export class App {
 
   protected readonly icons = ICONS;
   /** The sidebar: everything people do with money. */
-  protected readonly mainItems: NavItem[] = [DASHBOARD, ACCOUNTS, SEND, RECURRING, HISTORY];
+  protected readonly mainItems: NavItem[] = [DASHBOARD, ACCOUNTS, CARDS, SEND, RECURRING, HISTORY];
   /** The four most used destinations get a bottom tab on phones; the rest live behind "More". */
   protected readonly tabItems: NavItem[] = [DASHBOARD, ACCOUNTS, SEND, HISTORY];
   protected readonly moreItems: NavItem[] = [
+    CARDS,
     RECURRING,
     { path: '/security', label: 'Security', icon: ICONS.shield },
     { path: '/notifications', label: 'Notifications', icon: ICONS.bell },

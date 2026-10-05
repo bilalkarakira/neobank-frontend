@@ -12,6 +12,8 @@ const ACCOUNT: Account = {
   status: 'ACTIVE',
   nickname: null,
   balance: '0.00',
+  availableBalance: '0.00',
+  heldAmount: '0.00',
   createdAt: '2026-10-04T10:00:00Z',
 };
 

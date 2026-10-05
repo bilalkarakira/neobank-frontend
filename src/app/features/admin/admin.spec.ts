@@ -2,7 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Admin } from './admin';
-import { AdminAccount, AdminAccountPage, AuditEntry, CustomerDetail, Overview, Reconciliation, SecuritySnapshot } from './admin.models';
+import { AdminAccount, AdminAccountPage, AuditEntry, CardAuthorizationPage, CardAuthorizationRow, CustomerDetail, Overview, Reconciliation, SecuritySnapshot } from './admin.models';
 
 const OVERVIEW: Overview = {
   generatedAt: '2026-10-04T12:00:00Z',
@@ -690,4 +690,108 @@ describe('Admin page', () => {
     fixture.detectChanges();
     expect(el.textContent).toContain('Nothing has been recorded yet.');
   });
+
+  // ---- card authorizations ----
+
+  const authRow = (overrides: Partial<CardAuthorizationRow> = {}): CardAuthorizationRow => ({
+    id: 'r1',
+    createdAt: '2026-10-05T10:00:00Z',
+    last4: '0012',
+    cardKnown: true,
+    customerEmail: 'alice@example.com',
+    merchantName: 'Corner Cafe',
+    amount: '45.25',
+    status: 'AUTHORIZED',
+    responseCode: '00',
+    reason: null,
+    mti: '0100',
+    expiresAt: '2026-10-12T10:00:00Z',
+    ...overrides,
+  });
+  const authPage = (items: CardAuthorizationRow[], total = items.length, page = 0): CardAuthorizationPage => ({ items, total, page, size: 20 });
+  const authRequest = (predicate: (p: { get(name: string): string | null }) => boolean = () => true) =>
+    http.expectOne((r) => r.url === '/api/admin/authorizations' && predicate(r.params));
+  const openCards = (page: CardAuthorizationPage = authPage([authRow()])) => {
+    loadOverview();
+    click('Card authorizations');
+    authRequest().flush(page);
+    fixture.detectChanges();
+  };
+
+  it('lists card authorization decisions with the masked card, customer and result', () => {
+    openCards(authPage([
+      authRow(),
+      authRow({ id: 'r2', status: 'DECLINED', responseCode: '51', reason: 'Not enough available money.', amount: '500.00', merchantName: 'Big Store', expiresAt: null }),
+      authRow({ id: 'r3', status: 'DECLINED', responseCode: '14', reason: 'The card details did not match.', cardKnown: false, customerEmail: null, last4: '9999', expiresAt: null }),
+    ]));
+
+    const text = el.textContent!.replace(/\s+/g, ' ');
+    expect(text).toContain('•••• 0012');
+    expect(text).toContain('alice@example.com');
+    expect(text).toContain('Pending hold');
+    expect(text).toContain('Code 51 · Not enough available money.');
+    expect(text).toContain('unknown card');
+    expect(text).toContain('MTI 0100');
+    expect(el.textContent).not.toMatch(/\d{4} \d{4} \d{4} \d{4}/);
+  });
+
+  it('asks for the first page with the page size', () => {
+    loadOverview();
+    click('Card authorizations');
+    const req = http.expectOne((r) => r.url === '/api/admin/authorizations');
+    expect(req.request.params.get('page')).toBe('0');
+    expect(req.request.params.get('size')).toBe('20');
+    expect(req.request.params.has('status')).toBe(false);
+    expect(req.request.params.has('last4')).toBe(false);
+    req.flush(authPage([]));
+    fixture.detectChanges();
+    expect(el.textContent).toContain('No card authorizations match');
+  });
+
+  it('applies the status filter at once', () => {
+    openCards();
+    set('auth-status', 'DECLINED');
+    const req = authRequest((p) => p.get('status') === 'DECLINED');
+    expect(req.request.params.get('page')).toBe('0');
+    req.flush(authPage([]));
+  });
+
+  it('searches by the last four digits after a pause, and only when they are four digits', () => {
+    openCards();
+
+    set('auth-last4', '001');
+    vi.advanceTimersByTime(400);
+    http.expectNone((r) => r.url === '/api/admin/authorizations');
+    expect(el.textContent).toContain('Enter exactly four digits');
+
+    set('auth-last4', '0012');
+    http.expectNone((r) => r.url === '/api/admin/authorizations'); // waits for a pause in typing
+    vi.advanceTimersByTime(400);
+    authRequest((p) => p.get('last4') === '0012').flush(authPage([authRow()]));
+  });
+
+  it('pages through the decisions', () => {
+    openCards(authPage([authRow()], 45));
+    expect(el.textContent).toContain('Page 1 of 3');
+
+    click('Older');
+    const req = authRequest((p) => p.get('page') === '1');
+    req.flush(authPage([authRow({ id: 'r9' })], 45, 1));
+    fixture.detectChanges();
+    expect(el.textContent).toContain('Page 2 of 3');
+  });
+
+  it('offers a retry when the list cannot be loaded', () => {
+    loadOverview();
+    click('Card authorizations');
+    authRequest().flush(null, { status: 500, statusText: 'Server Error' });
+    fixture.detectChanges();
+    expect(el.textContent).toContain('Could not load the card authorizations');
+
+    click('Try again');
+    authRequest().flush(authPage([authRow()]));
+    fixture.detectChanges();
+    expect(el.textContent).toContain('•••• 0012');
+  });
+
 });

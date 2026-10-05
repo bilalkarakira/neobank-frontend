@@ -39,7 +39,7 @@
   </ng-template>
 
   <div class="mt-5 inline-flex rounded-xl bg-slate-100 p-1 text-sm" role="tablist">
-    @for (t of [['overview', 'Overview'], ['accounts', 'Accounts'], ['security', 'Security'], ['audit', 'Audit log']]; track t[0]) {
+    @for (t of [['overview', 'Overview'], ['accounts', 'Accounts'], ['security', 'Security'], ['cards', 'Card authorizations'], ['audit', 'Audit log']]; track t[0]) {
       <button type="button" role="tab" class="rounded-lg px-3 py-1.5 font-medium transition"
         [attr.aria-selected]="isTab($any(t[0]))" [class.bg-white]="isTab($any(t[0]))" [class.shadow-sm]="isTab($any(t[0]))"
         (click)="show($any(t[0]))">
@@ -564,6 +564,85 @@
       }
     }
 
+    @case ('cards') {
+      <form [formGroup]="cardFilters" class="mt-6 flex flex-wrap items-end gap-3" (submit)="$event.preventDefault()">
+        <div>
+          <label class="label" for="auth-status">Status</label>
+          <select id="auth-status" class="input" formControlName="status">
+            <option value="">All</option>
+            <option value="AUTHORIZED">Pending hold</option>
+            <option value="DECLINED">Declined</option>
+            <option value="REVERSED">Reversed</option>
+            <option value="EXPIRED">Expired</option>
+          </select>
+        </div>
+        <div>
+          <label class="label" for="auth-last4">Card ending in</label>
+          <input id="auth-last4" class="input w-28 font-mono" formControlName="last4" maxlength="4" inputmode="numeric" placeholder="1234" autocomplete="off"
+            [class.input-invalid]="cardFilters.controls.last4.invalid" />
+        </div>
+      </form>
+      @if (cardFilters.controls.last4.invalid) {
+        <p class="field-error">Enter exactly four digits, or leave the box empty.</p>
+      }
+      @if (cardsFailed()) {
+        <p class="alert-error mt-6" role="alert">
+          Could not load the card authorizations.
+          <button type="button" class="font-medium underline" (click)="loadCardAuthorizations(cardPageIndex())">Try again</button>
+        </p>
+      } @else if (cardPage(); as p) {
+        @if (p.items.length === 0) {
+          <p class="mt-6 rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
+            No card authorizations match.
+          </p>
+        } @else {
+          <div class="mt-6 overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <table class="w-full text-left text-sm">
+              <caption class="sr-only">Card authorization decisions, newest first</caption>
+              <thead class="text-xs uppercase tracking-wide text-slate-400">
+                <tr>
+                  <th class="px-4 py-3 font-medium">When</th>
+                  <th class="px-4 py-3 font-medium">Card</th>
+                  <th class="px-4 py-3 font-medium">Merchant</th>
+                  <th class="px-4 py-3 text-right font-medium">Amount</th>
+                  <th class="px-4 py-3 font-medium">Result</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of p.items; track row.id) {
+                  <tr class="border-t border-slate-100 align-top" [attr.data-auth]="row.id">
+                    <td class="whitespace-nowrap px-4 py-3">{{ row.createdAt | date: 'medium' }}<span class="block text-xs text-slate-400">MTI {{ row.mti }}</span></td>
+                    <td class="px-4 py-3">
+                      <span class="font-mono">•••• {{ row.last4 }}</span>
+                      <span class="block text-xs text-slate-400">{{ row.customerEmail ?? (row.cardKnown ? '' : 'unknown card') }}</span>
+                    </td>
+                    <td class="px-4 py-3">{{ row.merchantName ?? '-' }}</td>
+                    <td class="px-4 py-3 text-right tabular-nums">{{ row.amount }}</td>
+                    <td class="px-4 py-3">
+                      <span class="rounded-full px-2 py-0.5 text-xs font-semibold"
+                        [class.bg-brand-50]="row.status === 'AUTHORIZED'" [class.text-brand-700]="row.status === 'AUTHORIZED'"
+                        [class.bg-red-50]="row.status === 'DECLINED'" [class.text-red-700]="row.status === 'DECLINED'"
+                        [class.bg-slate-100]="row.status !== 'AUTHORIZED' && row.status !== 'DECLINED'"
+                        [class.text-slate-600]="row.status !== 'AUTHORIZED' && row.status !== 'DECLINED'">{{ cardStatusLabel(row.status) }}</span>
+                      <span class="block text-xs text-slate-500">Code {{ row.responseCode }}@if (row.reason) { · {{ row.reason }} }</span>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          @if (cardPageCount() > 1) {
+            <div class="mt-3 flex items-center justify-between text-sm">
+              <button type="button" class="rounded-lg px-3 py-1.5 font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-40" [disabled]="cardPageIndex() === 0" (click)="loadCardAuthorizations(cardPageIndex() - 1)">Newer</button>
+              <span class="text-slate-500">Page {{ cardPageIndex() + 1 }} of {{ cardPageCount() }} · {{ p.total }} decisions</span>
+              <button type="button" class="rounded-lg px-3 py-1.5 font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-40" [disabled]="cardPageIndex() + 1 >= cardPageCount()" (click)="loadCardAuthorizations(cardPageIndex() + 1)">Older</button>
+            </div>
+          }
+        }
+      } @else {
+        <p class="mt-6 text-sm text-slate-500">Loading…</p>
+      }
+    }
     @case ('audit') {
       @if (auditFailed()) {
         <p class="alert-error mt-6" role="alert">

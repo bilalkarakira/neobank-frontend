@@ -5,6 +5,8 @@ import {
   AdminAccountPage,
   AdminAccountStatus,
   AuditEntry,
+  CardAuthStatus,
+  CardAuthorizationPage,
   CustomerDetail,
   InterestRunSummary,
   Overview,
@@ -77,6 +79,18 @@ export class AdminService {
 
   clearProbingBlock(userId: string, reason: string): Observable<void> {
     return this.http.post<void>(`/api/admin/security/probing-blocks/${userId}/clear`, { reason });
+  }
+
+  /** Read-only list of card authorization decisions, newest first. */
+  cardAuthorizations(status: CardAuthStatus | '', last4: string, page: number, size: number): Observable<CardAuthorizationPage> {
+    let params = new HttpParams().set('page', page).set('size', size);
+    if (status !== '') {
+      params = params.set('status', status);
+    }
+    if (last4.trim() !== '') {
+      params = params.set('last4', last4.trim());
+    }
+    return this.http.get<CardAuthorizationPage>('/api/admin/authorizations', { params });
   }
 
   audit(): Observable<AuditEntry[]> {

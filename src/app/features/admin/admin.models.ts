@@ -127,3 +127,29 @@ export interface CustomerDetail {
   activeOrders: number;
   pausedOrders: number;
 }
+
+export type CardAuthStatus = 'AUTHORIZED' | 'DECLINED' | 'REVERSED' | 'EXPIRED' | 'CAPTURED';
+
+/** One card authorization decision. Only the last four digits of the card are ever sent. */
+export interface CardAuthorizationRow {
+  id: string;
+  createdAt: string;
+  last4: string;
+  /** False for a number that matched no card (a probe, a typo, a card from another issuer). */
+  cardKnown: boolean;
+  customerEmail: string | null;
+  merchantName: string | null;
+  amount: string;
+  status: CardAuthStatus;
+  responseCode: string;
+  reason: string | null;
+  mti: string;
+  expiresAt: string | null;
+}
+
+export interface CardAuthorizationPage {
+  items: CardAuthorizationRow[];
+  total: number;
+  page: number;
+  size: number;
+}

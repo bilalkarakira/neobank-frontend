@@ -57,6 +57,6 @@ export class Notifications {
   }
 
   protected icon(kind: string): string {
-    return kind === 'NEW_DEVICE_LOGIN' ? 'New login' : kind === 'LOGIN_LOCKED' ? 'Login locked' : 'Password';
+    return kind === 'NEW_DEVICE_LOGIN' ? 'New login' : kind === 'LOGIN_LOCKED' ? 'Login locked' : kind === 'CARD_FROZEN_PIN' ? 'Card' : 'Password';
   }
 }
