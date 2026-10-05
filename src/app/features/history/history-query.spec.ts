@@ -9,16 +9,38 @@ describe('history query helpers', () => {
   it('parses every URL parameter', () => {
     const { accountId, filter } = parseQuery(
       convertToParamMap({
-        account: 'a1', from: '2026-03-01', to: '2026-03-31', type: 'TRANSFER', direction: 'OUT',
+        account: 'a1', from: '2026-03-01', to: '2026-03-31', type: 'TRANSFER', direction: 'OUT', recurring: 'true',
         min: '10', max: '99.50', q: 'rent', sort: 'amount,asc', page: '3', size: '50',
       }),
     );
 
     expect(accountId).toBe('a1');
     expect(filter).toEqual({
-      from: '2026-03-01', to: '2026-03-31', type: 'TRANSFER', direction: 'OUT', minAmount: '10',
+      from: '2026-03-01', to: '2026-03-31', type: 'TRANSFER', direction: 'OUT', recurring: 'true', minAmount: '10',
       maxAmount: '99.50', q: 'rent', sort: 'amount,asc', page: 3, size: 50,
     });
+  });
+
+  it('accepts both recurring values and nothing else', () => {
+    expect(parseQuery(convertToParamMap({ recurring: 'true' })).filter.recurring).toBe('true');
+    expect(parseQuery(convertToParamMap({ recurring: 'false' })).filter.recurring).toBe('false');
+    for (const junk of ['maybe', '1', 'TRUE', '', 'true; drop table']) {
+      expect(parseQuery(convertToParamMap({ recurring: junk })).filter.recurring).toBe('');
+    }
+  });
+
+  it('puts the recurring filter in the URL and in the API call only when it is set', () => {
+    expect(toQueryParams('a1', DEFAULT_FILTER)).not.toHaveProperty('recurring');
+    expect(toApiParams(DEFAULT_FILTER, true)).not.toHaveProperty('recurring');
+
+    expect(toQueryParams('a1', { ...DEFAULT_FILTER, recurring: 'false' })).toEqual({ account: 'a1', recurring: 'false' });
+    expect(toApiParams({ ...DEFAULT_FILTER, recurring: 'true' }, false)).toEqual({ recurring: 'true', sort: 'date,desc' });
+    expect(toApiParams({ ...DEFAULT_FILTER, recurring: 'false' }, true)).toMatchObject({ recurring: 'false' });
+  });
+
+  it('round-trips the recurring filter through the URL', () => {
+    const filter = { ...DEFAULT_FILTER, recurring: 'false' as const, q: 'gym' };
+    expect(parseQuery(convertToParamMap(toQueryParams('a1', filter))).filter).toEqual(filter);
   });
 
   it('accepts the interest transaction type', () => {

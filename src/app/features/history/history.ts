@@ -68,6 +68,7 @@ export class History {
       to: [''],
       type: [''],
       direction: [''],
+      recurring: [''],
       minAmount: ['', Validators.pattern(AMOUNT_FORMAT)],
       maxAmount: ['', Validators.pattern(AMOUNT_FORMAT)],
       q: ['', Validators.maxLength(100)],
@@ -85,6 +86,7 @@ export class History {
           to: filter.to,
           type: filter.type,
           direction: filter.direction,
+          recurring: filter.recurring,
           minAmount: filter.minAmount,
           maxAmount: filter.maxAmount,
           q: filter.q,
@@ -103,6 +105,7 @@ export class History {
             to: v.to,
             type: v.type as HistoryFilter['type'],
             direction: v.direction as HistoryFilter['direction'],
+            recurring: v.recurring as HistoryFilter['recurring'],
             minAmount: v.minAmount.trim(),
             maxAmount: v.maxAmount.trim(),
             q: v.q.trim(),
@@ -174,7 +177,7 @@ export class History {
 
   protected hasFilters(): boolean {
     const f = this.query().filter;
-    return !!(f.from || f.to || f.type || f.direction || f.minAmount || f.maxAmount || f.q);
+    return !!(f.from || f.to || f.type || f.direction || f.recurring || f.minAmount || f.maxAmount || f.q);
   }
 
   protected clearFilters(): void {

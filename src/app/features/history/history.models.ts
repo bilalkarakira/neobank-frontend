@@ -6,6 +6,8 @@ export interface HistoryFilter {
   to: string;
   type: '' | 'DEPOSIT' | 'TRANSFER' | 'INTEREST';
   direction: '' | 'IN' | 'OUT';
+  /** Only payments made by a standing order ('true'), only the others ('false'), or both (empty). */
+  recurring: '' | 'true' | 'false';
   minAmount: string;
   maxAmount: string;
   q: string;

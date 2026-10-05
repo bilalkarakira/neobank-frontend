@@ -6,6 +6,7 @@ export const DEFAULT_FILTER: HistoryFilter = {
   to: '',
   type: '',
   direction: '',
+  recurring: '',
   minAmount: '',
   maxAmount: '',
   q: '',
@@ -27,6 +28,7 @@ export function parseQuery(params: ParamMap): HistoryQuery {
   const sort = params.get('sort') as SortOption | null;
   const type = params.get('type');
   const direction = params.get('direction');
+  const recurring = params.get('recurring');
   const page = Number(params.get('page'));
   const size = Number(params.get('size'));
   return {
@@ -36,6 +38,7 @@ export function parseQuery(params: ParamMap): HistoryQuery {
       to: params.get('to') ?? '',
       type: type === 'DEPOSIT' || type === 'TRANSFER' || type === 'INTEREST' ? type : '',
       direction: direction === 'IN' || direction === 'OUT' ? direction : '',
+      recurring: recurring === 'true' || recurring === 'false' ? recurring : '',
       minAmount: params.get('min') ?? '',
       maxAmount: params.get('max') ?? '',
       q: params.get('q') ?? '',
@@ -54,6 +57,7 @@ export function toQueryParams(accountId: string | null, filter: HistoryFilter): 
   if (filter.to) out['to'] = filter.to;
   if (filter.type) out['type'] = filter.type;
   if (filter.direction) out['direction'] = filter.direction;
+  if (filter.recurring) out['recurring'] = filter.recurring;
   if (filter.minAmount) out['min'] = filter.minAmount;
   if (filter.maxAmount) out['max'] = filter.maxAmount;
   if (filter.q) out['q'] = filter.q;
@@ -70,6 +74,7 @@ export function toApiParams(filter: HistoryFilter, withPaging: boolean): Record<
   if (filter.to) out['to'] = filter.to;
   if (filter.type) out['type'] = filter.type;
   if (filter.direction) out['direction'] = filter.direction;
+  if (filter.recurring) out['recurring'] = filter.recurring;
   if (filter.minAmount) out['minAmount'] = filter.minAmount;
   if (filter.maxAmount) out['maxAmount'] = filter.maxAmount;
   if (filter.q) out['q'] = filter.q;

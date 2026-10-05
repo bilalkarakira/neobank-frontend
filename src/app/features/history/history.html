@@ -60,6 +60,14 @@
             </select>
           </div>
           <div>
+            <label class="label" for="recurring">Payments</label>
+            <select id="recurring" class="input" formControlName="recurring">
+              <option value="">All payments</option>
+              <option value="true">Recurring only</option>
+              <option value="false">Not recurring</option>
+            </select>
+          </div>
+          <div>
             <label class="label" for="minAmount">Min amount</label>
             <input id="minAmount" class="input" formControlName="minAmount" inputmode="decimal" placeholder="0.00"
               [class.input-invalid]="form.controls.minAmount.invalid" />

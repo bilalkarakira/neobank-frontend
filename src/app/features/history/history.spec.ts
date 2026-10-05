@@ -123,9 +123,11 @@ describe('History page', () => {
       item({ transactionId: 't-plain', description: 'Lunch' }),
     ]));
 
-    expect(el.textContent).toContain('Recurring');
+    // only look at the results: the filter dropdown has "Recurring only" in it too
+    const results = [...el.querySelectorAll('tbody tr, ul > li')];
+    const badgesIn = (parts: Element[]) => parts.filter((p) => p.textContent?.includes('Recurring')).length;
     // the table row and the mobile card of the ONE recurring payment: two badges, none for the ordinary transfer
-    expect((el.textContent ?? '').match(/Recurring/g)).toHaveLength(2);
+    expect(badgesIn(results)).toBe(2);
     const rows = [...el.querySelectorAll('tbody tr')];
     expect(rows.find((r) => r.textContent?.includes('Gym membership'))?.textContent).toContain('Recurring');
     expect(rows.find((r) => r.textContent?.includes('Lunch'))?.textContent).not.toContain('Recurring');
@@ -133,7 +135,66 @@ describe('History page', () => {
 
   it('shows no badge at all when nothing is recurring', async () => {
     await open('', page([item()]));
-    expect(el.textContent).not.toContain('Recurring');
+    expect([...el.querySelectorAll('tbody tr, ul > li')].some((r) => r.textContent?.includes('Recurring'))).toBe(false);
+  });
+
+  it('offers a "Payments" filter with all, recurring only and not recurring', async () => {
+    await open('', page([item()]));
+    expect([...field('recurring').querySelectorAll('option')].map((o) => [o.value, o.textContent?.trim()])).toEqual([
+      ['', 'All payments'], ['true', 'Recurring only'], ['false', 'Not recurring'],
+    ]);
+  });
+
+  it('restores the recurring filter from the URL and sends it to the server', async () => {
+    await open('?account=a&recurring=true', null);
+
+    const req = listRequest();
+    expect(req.request.params.get('recurring')).toBe('true');
+    req.flush(page([item({ recurring: true })]));
+    harness.detectChanges();
+
+    expect(field('recurring').value).toBe('true');
+  });
+
+  it('choosing "Recurring only" reloads from the first page and puts the filter in the URL', async () => {
+    await open('?account=a&page=1', page([item()], { page: 1, totalElements: 41, totalPages: 3 }));
+
+    await typeInto('recurring', 'true');
+
+    expect(router.url).toBe('/history?account=a&recurring=true');
+    const req = listRequest();
+    expect(req.request.params.get('recurring')).toBe('true');
+    expect(req.request.params.get('page')).toBe('0');
+    req.flush(page([item({ recurring: true })]));
+  });
+
+  it('does not send the recurring parameter at all when it is "All payments"', async () => {
+    await open('?account=a', null);
+    const req = listRequest();
+    expect(req.request.params.has('recurring')).toBe(false);
+    req.flush(page([item()]));
+  });
+
+  it('shows the recurring filter as an active filter that "Clear filters" resets', async () => {
+    await open('?account=a&recurring=false', page([item()]));
+    expect(button('Clear filters')).toBeTruthy();
+
+    button('Clear filters').click();
+    await harness.fixture.whenStable();
+
+    expect(router.url).toBe('/history?account=a');
+    listRequest().flush(page([item()]));
+  });
+
+  it('exports with the same recurring filter', async () => {
+    await open('?account=a&recurring=true', page([item({ recurring: true })]));
+
+    button('Export CSV').click();
+    const req = http.expectOne((r) => r.url === '/api/accounts/a/transactions/export.csv');
+    expect(req.request.params.get('recurring')).toBe('true');
+    req.flush(new Blob(['a,b']), {
+      headers: { 'Content-Disposition': 'attachment; filename="neobank-x.csv"' },
+    });
   });
 
   it('offers an Interest type filter and renders interest as money from the bank', async () => {
