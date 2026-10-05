@@ -32,6 +32,8 @@ export interface TransactionItem {
   category: string | null;
   counterparty: Counterparty;
   createdAt: string;
+  /** True when a standing order made this payment (both the sender and the receiver see it). */
+  recurring: boolean;
 }
 
 export interface HistoryPage {

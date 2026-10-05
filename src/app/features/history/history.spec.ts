@@ -23,6 +23,7 @@ const item = (overrides: Partial<TransactionItem> = {}): TransactionItem => ({
   category: null,
   counterparty: { label: 'Second U.', iban: 'XX11NEOB1000000003', ownAccount: false },
   createdAt: '2026-10-04T17:11:08Z',
+  recurring: false,
   ...overrides,
 });
 const page = (items: TransactionItem[], extra: Partial<HistoryPage> = {}): HistoryPage => ({
@@ -114,6 +115,25 @@ describe('History page', () => {
     expect(rows[1].textContent).toContain('+$100.00');
     expect(rows[1].querySelector('td.text-emerald-700')).not.toBeNull();
     expect(el.textContent).toContain('2 transactions');
+  });
+
+  it('marks payments made by a standing order, and only those, in both the table and the mobile list', async () => {
+    await open('', page([
+      item({ transactionId: 't-rec', description: 'Gym membership', recurring: true }),
+      item({ transactionId: 't-plain', description: 'Lunch' }),
+    ]));
+
+    expect(el.textContent).toContain('Recurring');
+    // the table row and the mobile card of the ONE recurring payment: two badges, none for the ordinary transfer
+    expect((el.textContent ?? '').match(/Recurring/g)).toHaveLength(2);
+    const rows = [...el.querySelectorAll('tbody tr')];
+    expect(rows.find((r) => r.textContent?.includes('Gym membership'))?.textContent).toContain('Recurring');
+    expect(rows.find((r) => r.textContent?.includes('Lunch'))?.textContent).not.toContain('Recurring');
+  });
+
+  it('shows no badge at all when nothing is recurring', async () => {
+    await open('', page([item()]));
+    expect(el.textContent).not.toContain('Recurring');
   });
 
   it('offers an Interest type filter and renders interest as money from the bank', async () => {
