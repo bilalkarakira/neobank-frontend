@@ -4,6 +4,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { App } from './app';
 import { AuthService } from './core/auth/auth.service';
+import { NotificationsService } from './features/notifications/notifications.service';
 
 describe('App', () => {
   let http: HttpTestingController;
@@ -57,6 +58,32 @@ describe('App', () => {
     const nav = (customer.nativeElement as HTMLElement).querySelector('nav')?.textContent ?? '';
     expect(nav).not.toContain('Admin');
     expect(nav).toContain('Recurring'); // the rest of the menu is unchanged
+  });
+
+  it('shows the number of unread notifications next to the menu link, and nothing when there are none', () => {
+    const fixture = loggedInApp('CUSTOMER');
+    http.expectOne('/api/notifications').flush({ unreadCount: 3, items: [] });
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('[data-testid="unread-badge"]')?.textContent).toContain('3');
+    expect(el.querySelector('nav')?.textContent).toContain('Notifications');
+
+    TestBed.inject(NotificationsService).unread.set(0);
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid="unread-badge"]')).toBeNull();
+  });
+
+  it('forgets the count when the user logs out', () => {
+    vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    const fixture = loggedInApp('CUSTOMER');
+    http.expectOne('/api/notifications').flush({ unreadCount: 2, items: [] });
+    fixture.detectChanges();
+
+    buttonLabelled(fixture, 'Log out').click();
+    http.expectOne('/api/auth/logout').flush(null, { status: 204, statusText: 'No Content' });
+    fixture.detectChanges();
+
+    expect(TestBed.inject(NotificationsService).unread()).toBe(0);
   });
 
   it('Log out ends the session here, tells the server, and goes to the login page', () => {

@@ -44,6 +44,11 @@ export const routes: Routes = [
     loadComponent: () => import('./features/account-security/account-security').then((m) => m.AccountSecurity),
   },
   {
+    path: 'notifications',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/notifications/notifications').then((m) => m.Notifications),
+  },
+  {
     path: 'admin',
     canActivate: [adminGuard],
     loadComponent: () => import('./features/admin/admin').then((m) => m.Admin),

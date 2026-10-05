@@ -13,6 +13,12 @@
         <a routerLink="/transfer" routerLinkActive="bg-white/10 text-white" class="whitespace-nowrap rounded-lg px-3 py-1.5 text-slate-300 hover:bg-white/10">Send money</a>
         <a routerLink="/recurring" routerLinkActive="bg-white/10 text-white" class="whitespace-nowrap rounded-lg px-3 py-1.5 text-slate-300 hover:bg-white/10">Recurring</a>
         <a routerLink="/security" routerLinkActive="bg-white/10 text-white" class="whitespace-nowrap rounded-lg px-3 py-1.5 text-slate-300 hover:bg-white/10">Security</a>
+        <a routerLink="/notifications" routerLinkActive="bg-white/10 text-white" class="whitespace-nowrap rounded-lg px-3 py-1.5 text-slate-300 hover:bg-white/10">
+          Notifications
+          @if (notifications.unread() > 0) {
+            <span class="ml-1 rounded-full bg-indigo-500 px-1.5 py-0.5 text-xs font-semibold text-white" data-testid="unread-badge">{{ notifications.unread() }}<span class="sr-only"> unread</span></span>
+          }
+        </a>
         @if (auth.isAdmin()) {
           <a routerLink="/admin" routerLinkActive="bg-white/10 text-white" class="whitespace-nowrap rounded-lg px-3 py-1.5 text-amber-300 hover:bg-white/10">Admin</a>
         }
