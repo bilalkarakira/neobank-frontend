@@ -1,0 +1,120 @@
+<div class="mx-auto mt-10 w-full max-w-3xl px-4 pb-16">
+  <h1 class="text-2xl font-bold">Security</h1>
+
+  @if (notice(); as message) {
+    <p class="alert-success mt-4" role="status">{{ message }}</p>
+  }
+  @if (error(); as message) {
+    <p class="alert-error mt-4" role="alert">{{ message }}</p>
+  }
+
+  <section class="mt-6" aria-labelledby="sessions-heading">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <h2 id="sessions-heading" class="text-lg font-semibold">Where you are logged in</h2>
+      @if (otherCount() > 0) {
+        @if (confirming() === 'others') {
+          <span class="flex items-center gap-2 text-sm">
+            <span class="text-slate-600">Log out {{ otherCount() }} other device(s)?</span>
+            <button type="button" class="rounded-lg bg-red-600 px-3 py-1.5 font-semibold text-white hover:bg-red-500 disabled:opacity-50"
+              [disabled]="busy()" (click)="revokeOthers()">Yes, log them out</button>
+            <button type="button" class="rounded-lg px-3 py-1.5 font-medium text-slate-600 hover:bg-slate-100" (click)="cancelAsk()">Keep</button>
+          </span>
+        } @else {
+          <button type="button" class="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium hover:bg-slate-50"
+            (click)="ask('others')">Log out all other devices</button>
+        }
+      }
+    </div>
+    <p class="mt-1 text-sm text-slate-500">
+      If you do not recognise a device, log it out and change your password.
+      Devices stay listed until they log out or have not been used for 7 days.
+    </p>
+
+    @if (loadFailed()) {
+      <p class="alert-error mt-4" role="alert">
+        Could not load your sessions.
+        <button type="button" class="font-medium underline" (click)="load()">Try again</button>
+      </p>
+    } @else if (sessions(); as list) {
+      <ul class="mt-4 space-y-3">
+        @for (s of list; track s.id) {
+          <li class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div class="flex items-start justify-between gap-4">
+              <div class="min-w-0">
+                <p class="font-semibold">
+                  {{ s.device }}
+                  @if (s.current) {
+                    <span class="ml-2 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">This device</span>
+                  }
+                </p>
+                <p class="mt-0.5 text-sm text-slate-500">
+                  @if (s.ip) { {{ s.ip }} · }
+                  Signed in {{ s.startedAt | date: 'medium' }}
+                </p>
+                <p class="text-sm text-slate-500">Last active {{ s.lastActiveAt | date: 'medium' }}</p>
+              </div>
+              @if (confirming() === s.id) {
+                <span class="flex shrink-0 items-center gap-2 text-sm">
+                  <button type="button" class="rounded-lg bg-red-600 px-3 py-1.5 font-semibold text-white hover:bg-red-500 disabled:opacity-50"
+                    [disabled]="busy()" (click)="revoke(s)">{{ s.current ? 'Yes, log out' : 'Yes, remove' }}</button>
+                  <button type="button" class="rounded-lg px-3 py-1.5 font-medium text-slate-600 hover:bg-slate-100" (click)="cancelAsk()">Keep</button>
+                </span>
+              } @else {
+                <button type="button" class="shrink-0 rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium hover:bg-slate-50"
+                  (click)="ask(s.id)">{{ s.current ? 'Log out' : 'Remove' }}</button>
+              }
+            </div>
+          </li>
+        }
+      </ul>
+    } @else {
+      <p class="mt-4 text-sm text-slate-500">Loading…</p>
+    }
+  </section>
+
+  <section class="mt-10" aria-labelledby="password-heading">
+    <h2 id="password-heading" class="text-lg font-semibold">Change your password</h2>
+    <p class="mt-1 text-sm text-slate-500">Changing it logs out every other device. This one stays logged in.</p>
+
+    <form [formGroup]="form" (ngSubmit)="submit()" class="card mt-4 space-y-4" novalidate>
+      @if (formError(); as message) {
+        <p class="alert-error" role="alert">{{ message }}</p>
+      }
+
+      <div>
+        <label class="label" for="currentPassword">Current password</label>
+        <input id="currentPassword" type="password" class="input" formControlName="currentPassword" autocomplete="current-password"
+          [class.input-invalid]="showError(form.controls.currentPassword)" />
+        @if (showError(form.controls.currentPassword)) {
+          <p class="field-error">{{ serverMessage(form.controls.currentPassword) ?? 'Enter your current password.' }}</p>
+        }
+      </div>
+
+      <div>
+        <label class="label" for="newPassword">New password</label>
+        <input id="newPassword" type="password" class="input" formControlName="newPassword" autocomplete="new-password"
+          [class.input-invalid]="showError(form.controls.newPassword)" />
+        @if (showError(form.controls.newPassword)) {
+          <p class="field-error">
+            {{ serverMessage(form.controls.newPassword) ?? 'Use 10 to 72 characters with at least one letter and one digit.' }}
+          </p>
+        } @else {
+          <p class="mt-1 text-xs text-slate-500">10 to 72 characters, with at least one letter and one digit.</p>
+        }
+      </div>
+
+      <div>
+        <label class="label" for="confirmPassword">Repeat the new password</label>
+        <input id="confirmPassword" type="password" class="input" formControlName="confirmPassword" autocomplete="new-password"
+          [class.input-invalid]="showError(form.controls.confirmPassword)" />
+        @if (showError(form.controls.confirmPassword)) {
+          <p class="field-error">The two passwords do not match.</p>
+        }
+      </div>
+
+      <button type="submit" class="btn-primary" [disabled]="changing()">
+        {{ changing() ? 'Changing…' : 'Change password' }}
+      </button>
+    </form>
+  </section>
+</div>

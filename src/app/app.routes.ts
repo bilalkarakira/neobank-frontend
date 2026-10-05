@@ -39,6 +39,11 @@ export const routes: Routes = [
     loadComponent: () => import('./features/history/history').then((m) => m.History),
   },
   {
+    path: 'security',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/account-security/account-security').then((m) => m.AccountSecurity),
+  },
+  {
     path: 'admin',
     canActivate: [adminGuard],
     loadComponent: () => import('./features/admin/admin').then((m) => m.Admin),
