@@ -10,7 +10,7 @@
     <div class="grid grid-cols-2 gap-3">
       @for (t of types; track t.value) {
         <label
-          class="cursor-pointer rounded-lg border p-3 text-sm transition has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-50"
+          class="cursor-pointer rounded-lg border p-3 text-sm transition has-[:checked]:border-brand-500 has-[:checked]:bg-brand-50"
           [class.border-slate-300]="form.controls.type.value !== t.value"
         >
           <input type="radio" class="sr-only" formControlName="type" [value]="t.value" />

@@ -1,5 +1,8 @@
-<div class="mx-auto w-full max-w-5xl space-y-6 px-4 pb-16 pt-8">
-  <h1 class="text-2xl font-bold">Dashboard</h1>
+<div class="mx-auto w-full max-w-5xl space-y-6 px-4 pb-16 pt-8 sm:px-8 sm:pt-12">
+  <div>
+    <h1 class="page-title">Dashboard</h1>
+    <p class="page-subtitle">Where your money comes from and where it goes.</p>
+  </div>
 
   @if (accountsFailed()) {
     <p class="alert-error" role="alert">Could not load your accounts. Please try again later.</p>
@@ -42,19 +45,29 @@
           @case ('ok') {
             @if (summary(); as s) {
               @if (s.status === 'ok') {
-                <div class="card lg:col-span-1" [class.opacity-60]="s.refreshing">
-                  <p class="text-sm text-slate-500">Total balance</p>
-                  <p class="mt-1 text-5xl font-semibold tracking-tight">{{ formatMoney(s.data.totalBalance) }}</p>
-                  <p class="mt-2 text-xs text-slate-500">{{ selectedAccount() ? title(selectedAccount()!) : 'All accounts' }}</p>
+                <div class="rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-brand-800 p-6 text-white shadow-lg shadow-slate-300 lg:col-span-1" [class.opacity-60]="s.refreshing">
+                  <p class="text-sm font-medium text-brand-200">Total balance</p>
+                  <p class="mt-1 text-4xl font-bold tabular-nums tracking-tight sm:text-5xl" data-testid="hero-figure">{{ formatMoney(s.data.totalBalance) }}</p>
+                  <p class="mt-3 text-xs text-slate-300">{{ selectedAccount() ? title(selectedAccount()!) : 'All accounts' }}</p>
                 </div>
                 <div class="card" [class.opacity-60]="s.refreshing">
-                  <p class="text-sm text-slate-500">Income in {{ month(s.data.thisMonth.month) }}</p>
-                  <p class="mt-1 text-2xl font-semibold">{{ formatMoney(s.data.thisMonth.income) }}</p>
+                  <div class="flex items-center gap-2">
+                    <span class="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-50 text-emerald-600" aria-hidden="true">
+                      <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5m-6 6 6-6 6 6" /></svg>
+                    </span>
+                    <p class="text-sm text-slate-500">Income in {{ month(s.data.thisMonth.month) }}</p>
+                  </div>
+                  <p class="mt-3 text-2xl font-bold tabular-nums tracking-tight">{{ formatMoney(s.data.thisMonth.income) }}</p>
                   <p class="mt-2 text-xs text-slate-500">{{ formatChange(s.data.changePercent.income) }}</p>
                 </div>
                 <div class="card" [class.opacity-60]="s.refreshing">
-                  <p class="text-sm text-slate-500">Spending in {{ month(s.data.thisMonth.month) }}</p>
-                  <p class="mt-1 text-2xl font-semibold">{{ formatMoney(s.data.thisMonth.spending) }}</p>
+                  <div class="flex items-center gap-2">
+                    <span class="flex h-7 w-7 items-center justify-center rounded-full bg-orange-50 text-orange-600" aria-hidden="true">
+                      <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14m6-6-6 6-6-6" /></svg>
+                    </span>
+                    <p class="text-sm text-slate-500">Spending in {{ month(s.data.thisMonth.month) }}</p>
+                  </div>
+                  <p class="mt-3 text-2xl font-bold tabular-nums tracking-tight">{{ formatMoney(s.data.thisMonth.spending) }}</p>
                   <p class="mt-2 text-xs text-slate-500">{{ formatChange(s.data.changePercent.spending) }}</p>
                 </div>
               }
@@ -67,7 +80,7 @@
             </p>
           }
           @default {
-            <div class="card h-32 animate-pulse bg-slate-100 lg:col-span-1"></div>
+            <div class="h-36 animate-pulse rounded-2xl bg-slate-200 lg:col-span-1"></div>
             <div class="card h-32 animate-pulse bg-slate-100"></div>
             <div class="card h-32 animate-pulse bg-slate-100"></div>
           }
@@ -78,7 +91,7 @@
       <section class="card" aria-labelledby="balance-title">
         <div class="flex items-center justify-between gap-3">
           <h2 id="balance-title" class="text-base font-semibold">Balance over time</h2>
-          <button type="button" class="text-sm font-medium text-indigo-600 hover:underline" [attr.aria-pressed]="balanceAsTable()"
+          <button type="button" class="text-sm font-medium text-brand-600 hover:underline" [attr.aria-pressed]="balanceAsTable()"
             (click)="balanceAsTable.set(!balanceAsTable())">
             {{ balanceAsTable() ? 'Show chart' : 'Show data as table' }}
           </button>
@@ -126,7 +139,7 @@
         <section class="card flex flex-col" aria-labelledby="cashflow-title">
           <div class="flex items-center justify-between gap-3">
             <h2 id="cashflow-title" class="text-base font-semibold">Income vs spending</h2>
-            <button type="button" class="text-sm font-medium text-indigo-600 hover:underline" [attr.aria-pressed]="cashflowAsTable()"
+            <button type="button" class="text-sm font-medium text-brand-600 hover:underline" [attr.aria-pressed]="cashflowAsTable()"
               (click)="cashflowAsTable.set(!cashflowAsTable())">
               {{ cashflowAsTable() ? 'Show chart' : 'Show data as table' }}
             </button>

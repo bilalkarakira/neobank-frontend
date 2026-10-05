@@ -1,5 +1,6 @@
-<div class="mx-auto mt-10 w-full max-w-xl px-4 pb-16">
-  <h1 class="text-2xl font-bold">Send money</h1>
+<div class="mx-auto pt-8 sm:pt-12 w-full max-w-xl px-4 sm:px-8 pb-16">
+  <h1 class="page-title">Send money</h1>
+  <p class="page-subtitle">Move money between your accounts, or send it to anyone with their IBAN.</p>
 
   @if (loadFailed()) {
     <p class="alert-error mt-6" role="alert">
@@ -32,16 +33,16 @@
 
             <fieldset>
               <legend class="label">To</legend>
-              <div class="mb-3 inline-flex rounded-lg bg-slate-100 p-1 text-sm" role="tablist">
+              <div class="mb-3 grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1 text-sm" role="tablist">
                 <button type="button" role="tab" [attr.aria-selected]="!sendingToOthers()"
-                  class="rounded-md px-3 py-1.5 font-medium transition"
-                  [class.bg-white]="!sendingToOthers()" [class.shadow-sm]="!sendingToOthers()"
+                  class="rounded-lg px-3 py-2 font-medium text-slate-600 transition"
+                  [class.bg-white]="!sendingToOthers()" [class.shadow-sm]="!sendingToOthers()" [class.text-slate-900]="!sendingToOthers()"
                   (click)="setMode('own')">
                   My accounts
                 </button>
                 <button type="button" role="tab" [attr.aria-selected]="sendingToOthers()"
-                  class="rounded-md px-3 py-1.5 font-medium transition"
-                  [class.bg-white]="sendingToOthers()" [class.shadow-sm]="sendingToOthers()"
+                  class="rounded-lg px-3 py-2 font-medium text-slate-600 transition"
+                  [class.bg-white]="sendingToOthers()" [class.shadow-sm]="sendingToOthers()" [class.text-slate-900]="sendingToOthers()"
                   (click)="setMode('other')">
                   Someone else
                 </button>
@@ -91,10 +92,11 @@
 
             <div>
               <label class="label" for="amount">Amount (USD)</label>
-              <div class="flex items-center gap-2">
-                <span class="text-slate-500">$</span>
-                <input id="amount" class="input" formControlName="amount" inputmode="decimal" placeholder="0.00"
-                  autocomplete="off"
+              <div class="flex items-center gap-2 rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 focus-within:border-brand-500 focus-within:bg-white focus-within:ring-4 focus-within:ring-brand-100"
+                [class.border-red-400]="form.controls.amount.touched && form.controls.amount.invalid">
+                <span class="text-3xl font-semibold text-slate-400" aria-hidden="true">$</span>
+                <input id="amount" class="w-full bg-transparent text-3xl font-bold tabular-nums tracking-tight text-slate-900 placeholder:text-slate-300 focus:outline-none"
+                  formControlName="amount" inputmode="decimal" placeholder="0.00" autocomplete="off"
                   [class.input-invalid]="form.controls.amount.touched && form.controls.amount.invalid" />
               </div>
               @if (form.controls.amount.touched && form.controls.amount.invalid) {
@@ -141,7 +143,10 @@
 
         @case ('review') {
           <div class="card mt-6 space-y-5">
-            <h2 class="text-lg font-semibold">Review your transfer</h2>
+            <div class="text-center">
+              <h2 class="text-sm font-medium uppercase tracking-wide text-slate-400">Review your transfer</h2>
+              <p class="mt-2 text-4xl font-bold tabular-nums tracking-tight">{{ amountNumber(form.controls.amount.value) | currency: 'USD' }}</p>
+            </div>
 
             @if (error(); as message) {
               <p class="alert-error" role="alert">{{ message }}</p>
@@ -149,7 +154,7 @@
 
             @if (source(); as from) {
               @if (destination(); as to) {
-                <dl class="space-y-3 text-sm">
+                <dl class="space-y-4 rounded-2xl bg-slate-50 p-4 text-sm">
                   <div class="flex justify-between gap-4">
                     <dt class="text-slate-500">From</dt>
                     <dd class="text-right font-medium">{{ title(from) }}<br /><span class="font-mono text-xs text-slate-500">{{ formatIban(from.iban) }}</span></dd>
@@ -160,7 +165,7 @@
                   </div>
                   <div class="flex justify-between gap-4">
                     <dt class="text-slate-500">Amount</dt>
-                    <dd class="text-xl font-bold">{{ amountNumber(form.controls.amount.value) | currency: 'USD' }}</dd>
+                    <dd class="text-base font-bold">{{ amountNumber(form.controls.amount.value) | currency: 'USD' }}</dd>
                   </div>
                   @if (sendingToOthers() && selectedCategoryName(); as categoryName) {
                     <div class="flex justify-between gap-4">
@@ -182,7 +187,7 @@
               <button type="button" class="btn-primary" [disabled]="submitting()" (click)="confirm()">
                 {{ submitting() ? 'Sending…' : 'Confirm transfer' }}
               </button>
-              <button type="button" class="rounded-lg px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100"
+              <button type="button" class="rounded-xl px-5 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-100"
                 [disabled]="submitting()" (click)="back()">
                 Back
               </button>
@@ -193,8 +198,10 @@
         @case ('done') {
           @if (result(); as r) {
             <div class="card mt-6 space-y-4 text-center">
-              <p class="text-4xl" aria-hidden="true">✓</p>
-              <h2 class="text-lg font-semibold">Transfer sent</h2>
+              <span class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-brand-100 text-brand-700" aria-hidden="true">
+                <svg class="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>
+              </span>
+              <h2 class="text-xl font-bold">Transfer sent</h2>
               <p class="text-sm text-slate-600">
                 {{ amountNumber(r.amount) | currency: 'USD' }} was sent to
                 <span class="font-mono">{{ formatIban(r.destinationIban) }}</span>.
@@ -203,11 +210,11 @@
                 New balance of the source account: <strong>{{ amountNumber(r.balance) | currency: 'USD' }}</strong>
               </p>
               <div class="flex justify-center gap-3 pt-2">
-                <button type="button" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-50"
+                <button type="button" class="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold hover:bg-slate-50"
                   (click)="another()">
                   Make another transfer
                 </button>
-                <a routerLink="/home" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500">
+                <a routerLink="/home" class="rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700">
                   Back to accounts
                 </a>
               </div>

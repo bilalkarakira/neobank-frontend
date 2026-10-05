@@ -1,11 +1,12 @@
-<div class="mx-auto mt-10 w-full max-w-5xl px-4 pb-16">
+<div class="mx-auto pt-8 sm:pt-12 w-full max-w-5xl px-4 sm:px-8 pb-16">
   <div class="flex flex-wrap items-center justify-between gap-3">
-    <h1 class="text-2xl font-bold">Transaction history</h1>
-    <button type="button" class="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-50"
+    <h1 class="page-title">Transaction history</h1>
+    <button type="button" class="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold shadow-sm hover:bg-slate-50 disabled:opacity-50"
       [disabled]="!query().accountId || exporting()" (click)="exportCsv()">
       {{ exporting() ? 'Exporting…' : 'Export CSV' }}
     </button>
   </div>
+  <p class="page-subtitle">Every movement on your accounts. Filter, sort, search and export it.</p>
 
   @if (notice(); as message) {
     <p class="alert-success mt-4" role="status">{{ message }}</p>
@@ -94,7 +95,7 @@
         }
 
         @if (hasFilters()) {
-          <button type="button" class="text-sm font-medium text-indigo-600 hover:underline" (click)="clearFilters()">
+          <button type="button" class="text-sm font-medium text-brand-600 hover:underline" (click)="clearFilters()">
             Clear filters
           </button>
         }
@@ -116,7 +117,7 @@
                   <div class="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
                     @if (hasFilters()) {
                       <p class="font-medium">No transactions match your filters</p>
-                      <button type="button" class="mt-3 text-sm font-medium text-indigo-600 hover:underline"
+                      <button type="button" class="mt-3 text-sm font-medium text-brand-600 hover:underline"
                         (click)="clearFilters()">
                         Clear filters
                       </button>
@@ -166,7 +167,7 @@
                                 <span class="mt-1 inline-block rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">{{ item.category }}</span>
                               }
                               @if (item.recurring) {
-                                <span class="mt-1 inline-block rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700"
+                                <span class="mt-1 inline-block rounded-full bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-700"
                                   [class.ml-1]="item.category" title="Made by a recurring payment">Recurring</span>
                               }
                               @if (item.description) {
@@ -196,7 +197,7 @@
                             <p class="text-xs text-slate-500">
                               {{ item.createdAt | date: 'yyyy-MM-dd HH:mm' : 'UTC' }} UTC
                               @if (item.recurring) {
-                                <span class="ml-1 rounded-full bg-indigo-50 px-2 py-0.5 font-medium text-indigo-700">Recurring</span>
+                                <span class="ml-1 rounded-full bg-brand-50 px-2 py-0.5 font-medium text-brand-700">Recurring</span>
                               }
                             </p>
                             @if (item.description) {

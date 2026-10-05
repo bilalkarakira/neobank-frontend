@@ -113,7 +113,7 @@ describe('Dashboard', () => {
     answerAll();
 
     const text = el.textContent!;
-    expect(el.querySelectorAll('.text-5xl').length).toBe(1); // exactly one hero figure
+    expect(el.querySelectorAll('[data-testid=hero-figure]').length).toBe(1); // exactly one hero figure
     expect(text).toContain('$2,764.50');
     expect(text).toContain('Income in October 2026');
     expect(text).toContain('$1,557.50');
