@@ -86,6 +86,43 @@ describe('App', () => {
     expect(TestBed.inject(NotificationsService).unread()).toBe(0);
   });
 
+  it('puts the money destinations in the sidebar and the account ones under their own heading', () => {
+    const fixture = loggedInApp('CUSTOMER');
+    const sidebar = (fixture.nativeElement as HTMLElement).querySelector('aside')!;
+    const labels = [...sidebar.querySelectorAll('a')].map((a) => a.textContent?.replace(/\s+/g, ' ').trim());
+    expect(labels).toEqual(expect.arrayContaining(['Dashboard', 'Accounts', 'Send money', 'Recurring', 'History', 'Security']));
+    expect(sidebar.textContent).toContain('a@b.c'); // who is signed in
+  });
+
+  it('gives phones four bottom tabs and a More menu with the rest, closing it after a choice', () => {
+    const fixture = loggedInApp('CUSTOMER');
+    vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+    const el = fixture.nativeElement as HTMLElement;
+    const tabs = [...el.querySelectorAll('nav[aria-label="Quick"] a')].map((a) => a.textContent?.trim());
+    expect(tabs).toEqual(['Dashboard', 'Accounts', 'Send money', 'History']);
+    expect(el.querySelector('[role=menu]')).toBeNull();
+
+    (el.querySelector('nav[aria-label="Quick"] button') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    const menu = el.querySelector('[role=menu]')!;
+    expect(menu.textContent).toContain('Recurring');
+    expect(menu.textContent).toContain('Security');
+    expect(menu.textContent).toContain('Notifications');
+    expect(menu.textContent).not.toContain('Admin');
+
+    (menu.querySelector('a') as HTMLAnchorElement).click();
+    fixture.detectChanges();
+    expect(el.querySelector('[role=menu]')).toBeNull();
+  });
+
+  it('offers Admin in the More menu to administrators only', () => {
+    const fixture = loggedInApp('ADMIN');
+    const el = fixture.nativeElement as HTMLElement;
+    (el.querySelector('nav[aria-label="Quick"] button') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(el.querySelector('[role=menu]')?.textContent).toContain('Admin');
+  });
+
   it('Log out ends the session here, tells the server, and goes to the login page', () => {
     const fixture = loggedInApp('CUSTOMER');
     const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
