@@ -705,6 +705,7 @@ describe('Admin page', () => {
     responseCode: '00',
     reason: null,
     mti: '0100',
+    standIn: false,
     expiresAt: '2026-10-12T10:00:00Z',
     ...overrides,
   });
@@ -733,6 +734,15 @@ describe('Admin page', () => {
     expect(text).toContain('unknown card');
     expect(text).toContain('MTI 0100');
     expect(el.textContent).not.toMatch(/\d{4} \d{4} \d{4} \d{4}/);
+  });
+
+  it('tags the decisions the network made on its own while NeoBank was unavailable', () => {
+    openCards(authPage([authRow({ id: 'si', mti: '0120', standIn: true }), authRow({ id: 'normal' })]));
+
+    const tagged = [...el.querySelectorAll('[data-testid=stand-in-tag]')];
+    expect(tagged).toHaveLength(1);
+    expect(tagged[0].closest('[data-auth]')?.getAttribute('data-auth')).toBe('si');
+    expect(tagged[0].textContent).toContain('Approved by the network (stand-in)');
   });
 
   it('asks for the first page with the page size', () => {

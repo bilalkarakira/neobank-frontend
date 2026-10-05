@@ -213,6 +213,7 @@
                                 <span>
                                   <span class="font-medium">{{ a.merchantName ?? 'Card payment' }}</span>
                                   <span class="block text-xs text-slate-500">{{ a.createdAt | date: 'medium' }}@if (a.expiresAt) { · released automatically {{ a.expiresAt | date: 'mediumDate' }} if not cleared }</span>
+                                  @if (a.standIn) { <span class="block text-xs text-brand-700" data-testid="stand-in-note">Approved by the card network while NeoBank was unavailable</span> }
                                 </span>
                                 <span class="font-semibold tabular-nums">{{ number(a.amount) | currency: 'USD' }}</span>
                               </li>
@@ -232,6 +233,7 @@
                                   <span class="font-medium">{{ a.merchantName ?? 'Card payment' }}</span>
                                   <span class="block text-xs text-slate-500">{{ a.createdAt | date: 'medium' }}</span>
                                   @if (a.reason) { <span class="block text-xs text-red-600">{{ a.reason }}</span> }
+                                  @if (a.standIn) { <span class="block text-xs text-brand-700" data-testid="stand-in-note">Approved by the card network while NeoBank was unavailable</span> }
                                 </span>
                                 <span class="text-right">
                                   <span class="block font-semibold tabular-nums">{{ number(a.amount) | currency: 'USD' }}</span>

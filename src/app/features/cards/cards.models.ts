@@ -43,6 +43,8 @@ export interface CardAuthorization {
   responseCode: string;
   /** Plain-language reason for a decline; null for an approval. */
   reason: string | null;
+  /** Approved by the card network on its own while NeoBank was unavailable, and reported afterwards. */
+  standIn: boolean;
   createdAt: string;
   /** Only for a hold that still reserves money. */
   expiresAt: string | null;

@@ -144,6 +144,8 @@ export interface CardAuthorizationRow {
   responseCode: string;
   reason: string | null;
   mti: string;
+  /** Approved by the card network while NeoBank was unavailable, reported afterwards in an advice. */
+  standIn: boolean;
   expiresAt: string | null;
 }
 

@@ -47,6 +47,7 @@ const authorization = (overrides: Partial<CardAuthorization> = {}): CardAuthoriz
   status: 'AUTHORIZED',
   responseCode: '00',
   reason: null,
+  standIn: false,
   createdAt: '2026-10-05T10:00:00Z',
   expiresAt: '2026-10-12T10:00:00Z',
   ...overrides,
@@ -376,6 +377,26 @@ describe('Cards page', () => {
     expect(recent).toContain('Pending');
     expect(recent).toContain('Cancelled by the shop');
     expect(el.textContent).toContain('Nothing is posted to your balance yet');
+  });
+
+  it('marks a payment the card network approved while NeoBank was unavailable', () => {
+    loadData();
+    click('Show activity');
+    http.expectOne((r) => r.params.get('pending') === 'true').flush({
+      items: [authorization({ id: 'si1', merchantName: 'Gas Station', amount: '30.00', standIn: true })], page: 0, size: 1, totalElements: 1,
+    });
+    http.expectOne((r) => r.params.get('page') === '0').flush({
+      items: [authorization({ id: 'si1', merchantName: 'Gas Station', amount: '30.00', standIn: true }), authorization({ id: 'x2', merchantName: 'Corner Cafe' })],
+      page: 0, size: 10, totalElements: 2,
+    });
+    fixture.detectChanges();
+
+    const notes = [...el.querySelectorAll('[data-testid=stand-in-note]')].map((n) => n.textContent?.trim());
+    expect(notes).toEqual([
+      'Approved by the card network while NeoBank was unavailable',
+      'Approved by the card network while NeoBank was unavailable',
+    ]); // once in the pending list and once in the recent list, and only for the stand-in payment
+    expect(el.querySelector('[data-testid=recent]')!.textContent).toContain('Corner Cafe');
   });
 
   it('says when nothing is pending', () => {
