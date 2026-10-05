@@ -44,6 +44,8 @@ export interface HistoryPage {
   size: number;
   totalElements: number;
   totalPages: number;
+  /** Opaque position after the last item, for API clients that page by cursor; null on the last page. The page controls here still use page numbers. */
+  nextCursor?: string | null;
 }
 
 export type HistoryState =
