@@ -1,7 +1,7 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import { AuthorizationPage, Card, IssueCardRequest, IssuedCard } from './cards.models';
+import { AuthorizationPage, Card, IssueCardRequest, IssuedCard, Owed } from './cards.models';
 
 @Injectable({ providedIn: 'root' })
 export class CardsService {
@@ -31,6 +31,11 @@ export class CardsService {
 
   changeLimit(id: string, dailyLimit: string): Observable<Card> {
     return this.http.put<Card>(`${this.base}/${id}/limit`, { dailyLimit });
+  }
+
+  /** What the signed-in customer owes the bank after a cleared card payment that was bigger than their account could cover. */
+  owed(): Observable<Owed> {
+    return this.http.get<Owed>('/api/cards/owed');
   }
 
   /** Holds that still reserve money. */

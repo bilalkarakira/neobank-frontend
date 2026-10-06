@@ -155,3 +155,66 @@ export interface CardAuthorizationPage {
   page: number;
   size: number;
 }
+
+/** One clearing file the card network handed to NeoBank. */
+export interface ClearingFileRow {
+  fileName: string;
+  networkFileId: string | null;
+  status: 'RECEIVED' | 'DONE' | 'REJECTED';
+  /** Why a file was refused whole. */
+  reason: string | null;
+  itemCount: number;
+  controlTotal: string;
+  receivedAt: string;
+  ackWritten: boolean;
+}
+
+export type ClearingResult = 'POSTED' | 'FORCE_POSTED' | 'REFUND_POSTED' | 'DUPLICATE' | 'REJECTED';
+
+/** How one presentment was decided. Only the last four digits of the card are ever sent. */
+export interface ClearingItemRow {
+  fileName: string;
+  recordNo: number;
+  kind: 'PURCHASE' | 'REFUND';
+  amount: string;
+  last4: string;
+  merchantName: string | null;
+  result: ClearingResult;
+  reason: string | null;
+  covered: string;
+  shortfall: string;
+  forced: boolean;
+  createdAt: string;
+}
+
+export interface ClearingReceivableRow {
+  email: string;
+  last4: string;
+  amount: string;
+  outstanding: string;
+  createdAt: string;
+}
+
+export interface ClearingTotals {
+  receivableOutstanding: string;
+  settlementPayable: string;
+  postedNet: string;
+  receivableAccount: string;
+  /** The card settlement account equals posted purchases minus refunds, and the receivable account equals what is still owed. */
+  booksMatch: boolean;
+}
+
+export interface ClearingOverview {
+  enabled: boolean;
+  files: ClearingFileRow[];
+  items: ClearingItemRow[];
+  receivables: ClearingReceivableRow[];
+  totals: ClearingTotals;
+}
+
+export interface ClearingIngestResult {
+  filesProcessed: number;
+  filesRefused: number;
+  itemsPosted: number;
+  acknowledgementsWritten: number;
+}

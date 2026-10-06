@@ -22,6 +22,13 @@ describe('CardsService', () => {
     req.flush([]);
   });
 
+  it('asks what the customer owes the bank', () => {
+    service.owed().subscribe((o) => expect(o.total).toBe('5.50'));
+    const req = http.expectOne('/api/cards/owed');
+    expect(req.request.method).toBe('GET');
+    req.flush({ total: '5.50', items: [] });
+  });
+
   it('issues a card with the account and the optional name', () => {
     service.issue({ accountId: 'a1', nickname: null }).subscribe();
     const req = http.expectOne('/api/cards');

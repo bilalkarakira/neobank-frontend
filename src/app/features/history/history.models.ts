@@ -4,7 +4,7 @@ export interface HistoryFilter {
   /** Dates are UTC days, "YYYY-MM-DD"; empty string means "no limit". */
   from: string;
   to: string;
-  type: '' | 'DEPOSIT' | 'TRANSFER' | 'INTEREST';
+  type: '' | 'DEPOSIT' | 'TRANSFER' | 'INTEREST' | 'CARD_PURCHASE' | 'CARD_REFUND' | 'CARD_COLLECTION';
   direction: '' | 'IN' | 'OUT';
   /** Only payments made by a standing order ('true'), only the others ('false'), or both (empty). */
   recurring: '' | 'true' | 'false';
@@ -24,7 +24,7 @@ export interface Counterparty {
 
 export interface TransactionItem {
   transactionId: string;
-  type: 'DEPOSIT' | 'TRANSFER' | 'INTEREST';
+  type: 'DEPOSIT' | 'TRANSFER' | 'INTEREST' | 'CARD_PURCHASE' | 'CARD_REFUND' | 'CARD_COLLECTION' | 'CARD_SHORTFALL';
   direction: 'IN' | 'OUT';
   /** Signed decimal string: "-250.00" for money out, "250.00" for money in. */
   amount: string;

@@ -7,6 +7,9 @@ import {
   AuditEntry,
   CardAuthStatus,
   CardAuthorizationPage,
+  ClearingIngestResult,
+  ClearingOverview,
+  ClearingResult,
   CustomerDetail,
   InterestRunSummary,
   Overview,
@@ -79,6 +82,16 @@ export class AdminService {
 
   clearProbingBlock(userId: string, reason: string): Observable<void> {
     return this.http.post<void>(`/api/admin/security/probing-blocks/${userId}/clear`, { reason });
+  }
+
+  /** Clearing files, how every item was decided, what customers owe, and whether the books agree. */
+  clearing(result: ClearingResult | ''): Observable<ClearingOverview> {
+    return this.http.get<ClearingOverview>('/api/admin/clearing', { params: result === '' ? new HttpParams() : new HttpParams().set('result', result) });
+  }
+
+  /** Looks for new clearing files now (the server also does it every few seconds). Audited. */
+  runClearingIngest(): Observable<ClearingIngestResult> {
+    return this.http.post<ClearingIngestResult>('/api/admin/clearing/ingest', null);
   }
 
   /** Read-only list of card authorization decisions, newest first. */

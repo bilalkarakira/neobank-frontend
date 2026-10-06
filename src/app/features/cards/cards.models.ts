@@ -48,6 +48,17 @@ export interface CardAuthorization {
   createdAt: string;
   /** Only for a hold that still reserves money. */
   expiresAt: string | null;
+  /** What was actually taken from the balance once the payment cleared (a tip makes it more than `amount`). */
+  capturedAmount: string | null;
+  capturedAt: string | null;
+  /** Cleared although NeoBank never authorized it: the shop was paid by its bank, so it was posted anyway. */
+  forced: boolean;
+}
+
+/** What the customer owes the bank because a cleared card payment was more than their account could cover. */
+export interface Owed {
+  total: string;
+  items: { accountId: string; amount: string; outstanding: string; createdAt: string }[];
 }
 
 export interface AuthorizationPage {

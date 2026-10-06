@@ -7,7 +7,7 @@ import { ApiProblem } from '../../core/auth/auth.models';
 import { accountTitle } from '../accounts/account-title';
 import { Account } from '../accounts/accounts.models';
 import { AccountsService } from '../accounts/accounts.service';
-import { AuthorizationStatus, Card, CardAuthorization, IssuedCard } from './cards.models';
+import { AuthorizationStatus, Card, CardAuthorization, IssuedCard, Owed } from './cards.models';
 import { CardsService } from './cards.service';
 
 export const MAX_DAILY_LIMIT = 5000;
@@ -74,6 +74,7 @@ export class Cards {
 
   protected readonly open = signal<Record<string, boolean>>({});
   protected readonly activity = signal<Record<string, ActivityState>>({});
+  protected readonly owed = signal<Owed | null>(null);
 
   protected readonly title = accountTitle;
   protected readonly maxLimit = MAX_DAILY_LIMIT;
@@ -88,6 +89,8 @@ export class Cards {
   }
 
   protected load(): void {
+    // a nicety next to the cards: if it cannot be loaded the page simply shows no debt line
+    this.api.owed().subscribe({ next: (o) => this.owed.set(o), error: () => undefined });
     this.loadFailed.set(false);
     this.api.list().subscribe({
       next: (list) => this.cards.set(list),
@@ -293,6 +296,16 @@ export class Cards {
 
   protected statusLabel(status: AuthorizationStatus): string {
     return STATUS_LABELS[status];
+  }
+
+  /** The cleared (posted) payments among the shown ones, newest first. */
+  protected posted(items: CardAuthorization[]): CardAuthorization[] {
+    return items.filter((a) => a.status === 'CAPTURED');
+  }
+
+  /** True when what was posted differs from what was authorized (a tip, or an amount the shop changed). */
+  protected changed(a: CardAuthorization): boolean {
+    return a.capturedAmount !== null && Number(a.capturedAmount) !== Number(a.amount);
   }
 
   protected number(value: string): number {

@@ -50,8 +50,13 @@ const authorization = (overrides: Partial<CardAuthorization> = {}): CardAuthoriz
   standIn: false,
   createdAt: '2026-10-05T10:00:00Z',
   expiresAt: '2026-10-12T10:00:00Z',
+  capturedAmount: null,
+  capturedAt: null,
+  forced: false,
   ...overrides,
 });
+
+const NOTHING_OWED = { total: '0.00', items: [] };
 
 const PAN = '9999000000000012';
 const PIN = '4321';
@@ -72,7 +77,12 @@ describe('Cards page', () => {
     fixture.detectChanges();
   });
 
-  afterEach(() => http.verify());
+  // the debt line is a nicety fetched next to the cards: tests that do not care answer it with "nothing owed"
+  const settleOwed = () => http.match('/api/cards/owed').forEach((r) => r.flush(NOTHING_OWED));
+  afterEach(() => {
+    settleOwed();
+    http.verify();
+  });
 
   const loadData = (cards: Card[] = [card()], accounts: Account[] = [account()]) => {
     http.expectOne('/api/cards').flush(cards);
@@ -376,7 +386,7 @@ describe('Cards page', () => {
     expect(recent).toContain('Declined');
     expect(recent).toContain('Pending');
     expect(recent).toContain('Cancelled by the shop');
-    expect(el.textContent).toContain('Nothing is posted to your balance yet');
+    expect(text('no-posted')).toBe('Nothing has been posted yet.');
   });
 
   it('marks a payment the card network approved while NeoBank was unavailable', () => {
@@ -397,6 +407,52 @@ describe('Cards page', () => {
       'Approved by the card network while NeoBank was unavailable',
     ]); // once in the pending list and once in the recent list, and only for the stand-in payment
     expect(el.querySelector('[data-testid=recent]')!.textContent).toContain('Corner Cafe');
+  });
+
+  it('lists posted payments with what was really taken, a note when it differs, and a note for one posted without approval', () => {
+    loadData();
+    click('Show activity');
+    http.expectOne((r) => r.params.get('pending') === 'true').flush({ items: [], page: 0, size: 0, totalElements: 0 });
+    http.expectOne((r) => r.params.get('page') === '0').flush({
+      items: [
+        authorization({ id: 'p1', merchantName: 'Corner Cafe', amount: '50.00', status: 'CAPTURED', expiresAt: null, capturedAmount: '57.50', capturedAt: '2026-10-06T09:00:00Z' }),
+        authorization({ id: 'p2', merchantName: 'Gas Station', amount: '20.00', status: 'CAPTURED', expiresAt: null, capturedAmount: '20.00', capturedAt: '2026-10-06T09:05:00Z' }),
+        authorization({ id: 'p3', merchantName: 'Kiosk', amount: '5.00', status: 'CAPTURED', expiresAt: null, capturedAmount: '5.00', capturedAt: '2026-10-06T09:10:00Z', forced: true }),
+        authorization({ id: 'a1', merchantName: 'Pending Shop', amount: '9.00' }),
+      ],
+      page: 0, size: 10, totalElements: 4,
+    });
+    fixture.detectChanges();
+
+    const posted = el.querySelector('[data-testid=posted]')!;
+    expect(posted.querySelectorAll('li').length).toBe(3);
+    expect(posted.textContent).toContain('$57.50');
+    expect(posted.textContent).not.toContain('Pending Shop');
+    const changed = [...posted.querySelectorAll('[data-testid=changed-note]')].map((n) => n.textContent?.replace(/\s+/g, ' ').trim());
+    expect(changed).toEqual(['Authorized $50.00, posted $57.50 (a tip or a change by the shop)']);
+    expect(posted.querySelectorAll('[data-testid=forced-note]').length).toBe(1);
+    expect(posted.querySelector('[data-testid=forced-note]')!.textContent).toContain('posted anyway');
+    expect(el.querySelector('[data-testid=recent]')!.textContent).toContain('Posted');
+  });
+
+  it('tells a customer who owes the bank money, and why card payments fail', () => {
+    http.expectOne('/api/cards').flush([card()]);
+    http.expectOne('/api/accounts').flush([account()]);
+    http.expectOne('/api/cards/owed').flush({ total: '5.50', items: [{ accountId: 'a1', amount: '5.50', outstanding: '5.50', createdAt: '2026-10-06T09:00:00Z' }] });
+    fixture.detectChanges();
+
+    expect(text('owed')).toContain('You owe the bank $5.50');
+    expect(text('owed')).toContain('card payments are declined until then');
+  });
+
+  it('shows no debt line when nothing is owed or the amount cannot be loaded', () => {
+    http.expectOne('/api/cards').flush([card()]);
+    http.expectOne('/api/accounts').flush([account()]);
+    http.expectOne('/api/cards/owed').flush('boom', { status: 500, statusText: 'Server Error' });
+    fixture.detectChanges();
+
+    expect(el.querySelector('[data-testid=owed]')).toBeNull();
+    expect(el.textContent).toContain('Cards');
   });
 
   it('says when nothing is pending', () => {
@@ -434,6 +490,7 @@ describe('Cards page', () => {
 
     click('Hide activity');
     expect(el.textContent).not.toContain('Nothing is pending');
+    settleOwed();
     http.verify();
   });
 

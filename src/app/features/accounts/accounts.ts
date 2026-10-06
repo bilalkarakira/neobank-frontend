@@ -1,6 +1,7 @@
 import { CurrencyPipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { CardsService } from '../cards/cards.service';
 import { accountTitle } from './account-title';
 import { Account, DepositResponse } from './accounts.models';
 import { AccountsService } from './accounts.service';
@@ -15,6 +16,7 @@ import { OpenAccountForm } from './open-account-form';
 })
 export class Accounts {
   private readonly service = inject(AccountsService);
+  private readonly cards = inject(CardsService);
 
   protected readonly accounts = signal<Account[] | null>(null);
   protected readonly loadFailed = signal(false);
@@ -25,6 +27,9 @@ export class Accounts {
   /** Interest earned this year per savings account id; filled in after the list loads. */
   protected readonly earned = signal<Record<string, string>>({});
 
+  /** What the customer owes the bank after a cleared card payment their account could not cover (a nicety: absent if it cannot load). */
+  protected readonly owedToBank = signal<string>('0.00');
+
   protected readonly formatIban = formatIban;
 
   /** Sum of the open and frozen balances (closed accounts are empty by rule). Every account is in USD. */
@@ -32,6 +37,7 @@ export class Accounts {
 
   constructor() {
     this.load();
+    this.cards.owed().subscribe({ next: (o) => this.owedToBank.set(o.total), error: () => undefined });
   }
 
   protected load(): void {
@@ -63,6 +69,11 @@ export class Accounts {
   /** True when pending card payments reserve part of the balance. */
   protected hasHolds(account: Account): boolean {
     return Number(account.heldAmount) > 0;
+  }
+
+  /** True when a cleared card payment left the customer owing the bank money. */
+  protected owes(): boolean {
+    return Number(this.owedToBank()) > 0;
   }
 
   protected amountOf(value: string): number {

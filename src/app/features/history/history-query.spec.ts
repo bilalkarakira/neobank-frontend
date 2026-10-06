@@ -21,6 +21,14 @@ describe('history query helpers', () => {
     });
   });
 
+  it('accepts the card transaction types and drops unknown ones', () => {
+    for (const type of ['CARD_PURCHASE', 'CARD_REFUND', 'CARD_COLLECTION']) {
+      expect(parseQuery(convertToParamMap({ type })).filter.type).toBe(type);
+    }
+    expect(parseQuery(convertToParamMap({ type: 'CARD_SHORTFALL' })).filter.type).toBe('');
+    expect(parseQuery(convertToParamMap({ type: 'NOPE' })).filter.type).toBe('');
+  });
+
   it('accepts both recurring values and nothing else', () => {
     expect(parseQuery(convertToParamMap({ recurring: 'true' })).filter.recurring).toBe('true');
     expect(parseQuery(convertToParamMap({ recurring: 'false' })).filter.recurring).toBe('false');

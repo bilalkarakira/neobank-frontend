@@ -33,7 +33,29 @@ describe('Accounts', () => {
     return fixture;
   }
 
-  afterEach(() => http.verify());
+  // the debt banner is a nicety fetched next to the list: tests that do not care answer it with "nothing owed"
+  afterEach(() => {
+    http.match('/api/cards/owed').forEach((r) => r.flush({ total: '0.00', items: [] }));
+    http.verify();
+  });
+
+  it('tells a customer who owes the bank money, and says nothing otherwise', () => {
+    const fixture = render();
+    http.expectOne('/api/accounts').flush([account()]);
+    http.expectOne('/api/cards/owed').flush({ total: '5.50', items: [{ accountId: '1', amount: '5.50', outstanding: '5.50', createdAt: '2026-10-06T09:00:00Z' }] });
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('[data-testid=owed]')?.textContent).toContain('You owe the bank $5.50');
+    expect(el.querySelector('[data-testid=owed]')?.textContent).toContain('next deposit or refund');
+  });
+
+  it('shows no debt banner when nothing is owed or the amount cannot be loaded', () => {
+    const fixture = render();
+    http.expectOne('/api/accounts').flush([account()]);
+    http.expectOne('/api/cards/owed').flush('boom', { status: 500, statusText: 'Server Error' });
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid=owed]')).toBeNull();
+  });
 
   it('shows the empty state when there are no accounts', () => {
     const fixture = render();

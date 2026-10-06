@@ -16,6 +16,7 @@ export const DEFAULT_FILTER: HistoryFilter = {
 };
 
 export const PAGE_SIZES = [10, 20, 50, 100];
+const TYPES: HistoryFilter['type'][] = ['', 'DEPOSIT', 'TRANSFER', 'INTEREST', 'CARD_PURCHASE', 'CARD_REFUND', 'CARD_COLLECTION'];
 const SORTS: SortOption[] = ['date,desc', 'date,asc', 'amount,desc', 'amount,asc'];
 
 export interface HistoryQuery {
@@ -36,7 +37,7 @@ export function parseQuery(params: ParamMap): HistoryQuery {
     filter: {
       from: params.get('from') ?? '',
       to: params.get('to') ?? '',
-      type: type === 'DEPOSIT' || type === 'TRANSFER' || type === 'INTEREST' ? type : '',
+      type: TYPES.includes(type as HistoryFilter['type']) && type !== '' ? (type as HistoryFilter['type']) : '',
       direction: direction === 'IN' || direction === 'OUT' ? direction : '',
       recurring: recurring === 'true' || recurring === 'false' ? recurring : '',
       minAmount: params.get('min') ?? '',

@@ -22,6 +22,12 @@
   @if (notice(); as message) {
     <p class="alert-success mb-4" role="status">{{ message }}</p>
   }
+  @if (owes()) {
+    <p class="alert-error mb-4" role="status" data-testid="owed">
+      You owe the bank <strong>{{ amountOf(owedToBank()) | currency: 'USD' }}</strong> from a card payment that cleared for more than your account could cover.
+      Your next deposit or refund pays it off, and card payments are declined until then.
+    </p>
+  }
 
   @if (showForm()) {
     <div class="mb-6">

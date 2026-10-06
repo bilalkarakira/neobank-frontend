@@ -15,13 +15,15 @@ import {
   AuditEntry,
   CardAuthStatus,
   CardAuthorizationPage,
+  ClearingOverview,
+  ClearingResult,
   Overview,
   Reconciliation,
   SecuritySnapshot,
 } from './admin.models';
 import { AdminService } from './admin.service';
 
-type Tab = 'overview' | 'accounts' | 'customer' | 'security' | 'cards' | 'audit';
+type Tab = 'overview' | 'accounts' | 'customer' | 'security' | 'cards' | 'clearing' | 'audit';
 /** What an action on an account needs to show: enough to name it, whichever list it was picked from. */
 type Target = { id: string; iban: string; ownerEmail: string };
 type Pending = { account: Target; kind: 'freeze' | 'unfreeze' | 'close' };
@@ -36,6 +38,7 @@ const ACTION_LABELS: Record<string, string> = {
   UNFREEZE_ACCOUNT: 'Unfroze account',
   RUN_INTEREST: 'Ran the interest job',
   RUN_RECURRING: 'Ran recurring payments',
+  RUN_CLEARING_INGEST: 'Looked for clearing files',
   UNLOCK_LOGIN: 'Unlocked a login',
   CLEAR_PROBING_BLOCK: 'Lifted a probing block',
   CLOSE_ACCOUNT: 'Closed account',
@@ -94,6 +97,12 @@ export class Admin {
     last4: ['', Validators.pattern(/^\d{4}$/)],
   });
 
+  // clearing
+  protected readonly clearing = signal<ClearingOverview | null>(null);
+  protected readonly clearingFailed = signal(false);
+  protected readonly clearingBusy = signal(false);
+  protected readonly clearingResult = this.fb.control<ClearingResult | ''>('');
+
   // audit
   protected readonly audit = signal<AuditEntry[] | null>(null);
   protected readonly auditFailed = signal(false);
@@ -114,6 +123,7 @@ export class Admin {
     merge(this.filters.controls.q.valueChanges.pipe(debounceTime(300)), this.filters.controls.status.valueChanges)
       .pipe(takeUntilDestroyed())
       .subscribe(() => this.loadAccounts(0));
+    this.clearingResult.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => this.loadClearing());
     // the card list reloads on a status change at once, and on four typed digits (or none) after a pause
     merge(this.cardFilters.controls.status.valueChanges, this.cardFilters.controls.last4.valueChanges.pipe(debounceTime(300)))
       .pipe(takeUntilDestroyed())
@@ -137,6 +147,9 @@ export class Admin {
     }
     if (tab === 'cards') {
       this.loadCardAuthorizations(0);
+    }
+    if (tab === 'clearing') {
+      this.loadClearing();
     }
     if (tab === 'audit') {
       this.loadAudit();
@@ -225,6 +238,48 @@ export class Admin {
 
   protected cardStatusLabel(status: CardAuthStatus): string {
     return { AUTHORIZED: 'Pending hold', DECLINED: 'Declined', REVERSED: 'Reversed', EXPIRED: 'Expired', CAPTURED: 'Posted' }[status];
+  }
+
+  // ---- clearing ---------------------------------------------------------------------------------------------
+
+  protected loadClearing(): void {
+    this.clearingFailed.set(false);
+    this.api.clearing(this.clearingResult.value).subscribe({
+      next: (c) => this.clearing.set(c),
+      error: () => this.clearingFailed.set(true),
+    });
+  }
+
+  /** Looks for new clearing files now; the server also does it by itself every few seconds. */
+  protected ingestNow(): void {
+    this.clearingBusy.set(true);
+    this.error.set(null);
+    this.notice.set(null);
+    this.api.runClearingIngest().subscribe({
+      next: (r) => {
+        this.clearingBusy.set(false);
+        this.notice.set(
+          r.filesProcessed + r.filesRefused === 0
+            ? 'No new clearing files.'
+            : `${r.filesProcessed} file(s) processed (${r.itemsPosted} item(s) posted), ${r.filesRefused} refused.`,
+        );
+        this.loadClearing();
+      },
+      error: (err: unknown) => {
+        this.clearingBusy.set(false);
+        this.error.set(this.messageFor(err));
+      },
+    });
+  }
+
+  protected resultLabel(result: ClearingResult): string {
+    return {
+      POSTED: 'Posted',
+      FORCE_POSTED: 'Posted without an authorization',
+      REFUND_POSTED: 'Refund posted',
+      DUPLICATE: 'Already posted',
+      REJECTED: 'Rejected',
+    }[result];
   }
 
   // ---- accounts ---------------------------------------------------------------------------------------------

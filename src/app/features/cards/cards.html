@@ -18,6 +18,14 @@
   @if (error(); as message) {
     <p class="alert-error mt-4" role="alert">{{ message }}</p>
   }
+  @if (owed(); as debt) {
+    @if (number(debt.total) > 0) {
+      <p class="alert-error mt-4" role="status" data-testid="owed">
+        You owe the bank <strong>{{ number(debt.total) | currency: 'USD' }}</strong> from a card payment that cleared for more than your account could cover.
+        Your next deposit or refund pays it off, and card payments are declined until then.
+      </p>
+    }
+  }
 
   @if (revealed(); as issued) {
     <section class="mt-6 rounded-2xl border-2 border-amber-300 bg-amber-50 p-5" aria-labelledby="reveal-title" data-testid="reveal">
@@ -221,8 +229,30 @@
                           </ul>
                         }
 
+                        <h3 class="mt-5 text-sm font-semibold">Posted <span class="font-normal text-slate-500">(cleared and taken from your balance)</span></h3>
+                        @if (state.status === 'ready' && posted(state.recent).length === 0) {
+                          <p class="mt-1 text-sm text-slate-500" data-testid="no-posted">Nothing has been posted yet.</p>
+                        } @else {
+                          <ul class="mt-2 divide-y divide-slate-100 rounded-xl border border-slate-200" data-testid="posted">
+                            @for (a of posted(state.recent); track a.id) {
+                              <li class="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+                                <span>
+                                  <span class="font-medium">{{ a.merchantName ?? 'Card payment' }}</span>
+                                  <span class="block text-xs text-slate-500">{{ a.capturedAt ?? a.createdAt | date: 'medium' }}</span>
+                                  @if (changed(a)) {
+                                    <span class="block text-xs text-slate-500" data-testid="changed-note">Authorized {{ number(a.amount) | currency: 'USD' }}, posted {{ number(a.capturedAmount ?? a.amount) | currency: 'USD' }} (a tip or a change by the shop)</span>
+                                  }
+                                  @if (a.forced) {
+                                    <span class="block text-xs text-amber-700" data-testid="forced-note">The shop's bank sent this payment without a matching approval from NeoBank; it was posted anyway.</span>
+                                  }
+                                </span>
+                                <span class="font-semibold tabular-nums">{{ number(a.capturedAmount ?? a.amount) | currency: 'USD' }}</span>
+                              </li>
+                            }
+                          </ul>
+                        }
+
                         <h3 class="mt-5 text-sm font-semibold">Recent card activity</h3>
-                        <p class="text-xs text-slate-500">Nothing is posted to your balance yet: posting arrives with the clearing step, a later phase of this project.</p>
                         @if (state.recent.length === 0) {
                           <p class="mt-2 text-sm text-slate-500">No card payments yet.</p>
                         } @else {

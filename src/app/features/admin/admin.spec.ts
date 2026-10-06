@@ -693,6 +693,118 @@ describe('Admin page', () => {
 
   // ---- card authorizations ----
 
+  // ---- clearing tab ----
+
+  const CLEARING = {
+    enabled: true,
+    files: [
+      { fileName: 'N0000002.clr', networkFileId: null, status: 'REJECTED', reason: 'DECRYPT_FAILED: the file cannot be decrypted', itemCount: 0, controlTotal: '0.00', receivedAt: '2026-10-06T11:00:00Z', ackWritten: true },
+      { fileName: 'N0000001.clr', networkFileId: 'N0000001', status: 'DONE', reason: null, itemCount: 2, controlTotal: '60.00', receivedAt: '2026-10-06T10:00:00Z', ackWritten: true },
+    ],
+    items: [
+      { fileName: 'N0000001.clr', recordNo: 1, kind: 'PURCHASE', amount: '57.50', last4: '0012', merchantName: 'Corner Cafe', result: 'POSTED', reason: 'shortfall 5.50 owed by the customer', covered: '52.00', shortfall: '5.50', forced: false, createdAt: '2026-10-06T10:00:01Z' },
+      { fileName: 'N0000001.clr', recordNo: 2, kind: 'PURCHASE', amount: '2.50', last4: '0020', merchantName: 'Kiosk', result: 'REJECTED', reason: 'unknown card', covered: '0.00', shortfall: '0.00', forced: false, createdAt: '2026-10-06T10:00:02Z' },
+    ],
+    receivables: [{ email: 'alice@example.com', last4: '0012', amount: '5.50', outstanding: '3.50', createdAt: '2026-10-06T10:00:01Z' }],
+    totals: { receivableOutstanding: '3.50', settlementPayable: '57.50', postedNet: '57.50', receivableAccount: '-3.50', booksMatch: true },
+  };
+  const clearingRequest = (predicate: (p: { get(name: string): string | null }) => boolean = () => true) =>
+    http.expectOne((r) => r.method === 'GET' && r.url === '/api/admin/clearing' && predicate(r.params));
+  const openClearing = (data: object = CLEARING) => {
+    loadOverview();
+    click('Clearing');
+    clearingRequest().flush(data);
+    fixture.detectChanges();
+  };
+
+  it('shows the clearing files, how items were decided, what customers owe and a books check that agrees', () => {
+    openClearing();
+
+    expect(el.querySelector('[data-testid=owed-total]')!.textContent!.trim()).toBe('3.50');
+    expect(el.querySelector('[data-testid=settlement-total]')!.textContent!.trim()).toBe('57.50');
+    expect(el.querySelector('[data-testid=clearing-books]')!.textContent).toContain('The books agree');
+    const files = el.querySelector('[data-testid=clearing-files]')!.textContent!;
+    expect(files).toContain('N0000001.clr');
+    expect(files).toContain('Processed');
+    expect(files).toContain('Refused');
+    expect(files).toContain('DECRYPT_FAILED');
+    const items = el.querySelector('[data-testid=clearing-items]')!.textContent!;
+    expect(items).toContain('•••• 0012');
+    expect(items).toContain('customer owes 5.50');
+    expect(items).toContain('Rejected');
+    expect(items).toContain('unknown card');
+    expect(el.querySelector('[data-testid=receivables]')!.textContent).toContain('alice@example.com');
+    expect(el.textContent).not.toContain('9999000000000012');
+  });
+
+  it('warns loudly when the books do not agree with the posted items', () => {
+    openClearing({ ...CLEARING, totals: { ...CLEARING.totals, booksMatch: false } });
+
+    expect(el.querySelector('[data-testid=clearing-books]')!.textContent).toContain('do NOT agree');
+  });
+
+  it('says so when nothing has arrived and nobody owes anything', () => {
+    openClearing({ ...CLEARING, files: [], items: [], receivables: [] });
+
+    expect(el.querySelector('[data-testid=no-clearing-files]')).not.toBeNull();
+    expect(el.querySelector('[data-testid=no-clearing-items]')).not.toBeNull();
+    expect(el.querySelector('[data-testid=no-receivables]')).not.toBeNull();
+  });
+
+  it('asks the server for one result when the filter changes', () => {
+    openClearing();
+    const select = el.querySelector<HTMLSelectElement>('#clearing-result')!;
+    select.value = 'REJECTED';
+    select.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+
+    clearingRequest((p) => p.get('result') === 'REJECTED').flush({ ...CLEARING, items: [CLEARING.items[1]] });
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid=clearing-items]')!.querySelectorAll('tbody tr').length).toBe(1);
+  });
+
+  it('looks for clearing files on request and reports what happened', () => {
+    openClearing();
+
+    click('Look for clearing files now');
+    const post = http.expectOne((r) => r.method === 'POST' && r.url === '/api/admin/clearing/ingest');
+    post.flush({ filesProcessed: 1, filesRefused: 0, itemsPosted: 2, acknowledgementsWritten: 1 });
+    fixture.detectChanges();
+    clearingRequest().flush(CLEARING);
+    fixture.detectChanges();
+
+    expect(el.textContent).toContain('1 file(s) processed (2 item(s) posted), 0 refused.');
+  });
+
+  it('says there is nothing new when no file arrived, and shows a failure of the button', () => {
+    openClearing();
+    click('Look for clearing files now');
+    http.expectOne((r) => r.method === 'POST' && r.url === '/api/admin/clearing/ingest').flush({ filesProcessed: 0, filesRefused: 0, itemsPosted: 0, acknowledgementsWritten: 0 });
+    clearingRequest().flush(CLEARING);
+    fixture.detectChanges();
+    expect(el.textContent).toContain('No new clearing files.');
+
+    click('Look for clearing files now');
+    http.expectOne((r) => r.method === 'POST' && r.url === '/api/admin/clearing/ingest').flush({ title: 'x' }, { status: 500, statusText: 'Server Error' });
+    fixture.detectChanges();
+    expect(el.querySelector('[role=alert]')).not.toBeNull();
+    expect(button('Look for clearing files now').disabled).toBe(false);
+  });
+
+  it('offers a retry when the clearing overview cannot be loaded, and disables the button when the job is off', () => {
+    loadOverview();
+    click('Clearing');
+    clearingRequest().flush('boom', { status: 500, statusText: 'Server Error' });
+    fixture.detectChanges();
+    expect(el.textContent).toContain('Could not load the clearing overview');
+
+    click('Try again');
+    clearingRequest().flush({ ...CLEARING, enabled: false });
+    fixture.detectChanges();
+    expect(button('Look for clearing files now').disabled).toBe(true);
+    expect(el.textContent).toContain('switched off on this server');
+  });
+
   const authRow = (overrides: Partial<CardAuthorizationRow> = {}): CardAuthorizationRow => ({
     id: 'r1',
     createdAt: '2026-10-05T10:00:00Z',

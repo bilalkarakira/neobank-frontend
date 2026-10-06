@@ -112,4 +112,25 @@ describe('AdminService', () => {
     expect(filtered.request.params.get('page')).toBe('2');
     filtered.flush({ items: [], total: 0, page: 2, size: 20 });
   });
+
+  it('asks for the clearing overview, with a result filter only when one is chosen', () => {
+    service.clearing('').subscribe();
+    const plain = http.expectOne((r) => r.url === '/api/admin/clearing');
+    expect(plain.request.method).toBe('GET');
+    expect(plain.request.params.has('result')).toBe(false);
+    plain.flush({});
+
+    service.clearing('REJECTED').subscribe();
+    const filtered = http.expectOne((r) => r.url === '/api/admin/clearing');
+    expect(filtered.request.params.get('result')).toBe('REJECTED');
+    filtered.flush({});
+  });
+
+  it('runs the clearing ingest with a POST and no body', () => {
+    service.runClearingIngest().subscribe();
+    const req = http.expectOne('/api/admin/clearing/ingest');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toBeNull();
+    req.flush({ filesProcessed: 0, filesRefused: 0, itemsPosted: 0, acknowledgementsWritten: 0 });
+  });
 });
