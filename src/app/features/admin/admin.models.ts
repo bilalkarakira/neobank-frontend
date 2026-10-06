@@ -218,3 +218,70 @@ export interface ClearingIngestResult {
   itemsPosted: number;
   acknowledgementsWritten: number;
 }
+
+/** A settlement statement of the card network as NeoBank decided it. Figures are decimal strings, null when the file was unreadable. */
+export interface SettlementRunRow {
+  runNumber: string | null;
+  fileName: string;
+  businessDate: string | null;
+  valueDate: string | null;
+  status: 'MATCHED' | 'DISPUTED' | 'REFUSED';
+  purchases: string | null;
+  refunds: string | null;
+  interchange: string | null;
+  schemeFee: string | null;
+  /** Signed: negative means NeoBank pays. */
+  net: string | null;
+  itemCount: number | null;
+  /** Why it was disputed or refused. */
+  reason: string | null;
+  receivedAt: string;
+}
+
+/** One difference between what was authorized, cleared and settled. Only the last four digits of a card are ever sent. */
+export interface ReconciliationFinding {
+  kind: string;
+  businessDate: string | null;
+  last4: string;
+  ours: string;
+  theirs: string;
+  message: string;
+}
+
+/** A cleared item that no settlement run has covered yet (not an exception: just not finished). */
+export interface WaitingItem {
+  businessDate: string;
+  last4: string;
+  kind: 'PURCHASE' | 'REFUND';
+  amount: string;
+  merchantName: string | null;
+}
+
+export interface ReconciliationTotals {
+  authorizedOpen: number;
+  authorizedOpenAmount: string;
+  cleared: number;
+  clearedAmount: string;
+  settled: number;
+  settledAmount: string;
+  notYetSettled: number;
+  notYetSettledAmount: string;
+  settlementPayable: string;
+  ledgerAgrees: boolean;
+}
+
+export interface SettlementReport {
+  date: string | null;
+  businessDates: string[];
+  runs: SettlementRunRow[];
+  totals: ReconciliationTotals;
+  findings: ReconciliationFinding[];
+  notYetSettled: WaitingItem[];
+  allAgree: boolean;
+}
+
+export interface SettlementIngestResult {
+  matched: number;
+  disputed: number;
+  refused: number;
+}

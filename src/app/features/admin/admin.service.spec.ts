@@ -133,4 +133,25 @@ describe('AdminService', () => {
     expect(req.request.body).toBeNull();
     req.flush({ filesProcessed: 0, filesRefused: 0, itemsPosted: 0, acknowledgementsWritten: 0 });
   });
+
+  it('asks for the settlement overview, with a day only when one is chosen', () => {
+    service.settlement('').subscribe();
+    const all = http.expectOne((r) => r.url === '/api/admin/settlement');
+    expect(all.request.method).toBe('GET');
+    expect(all.request.params.has('date')).toBe(false);
+    all.flush({});
+
+    service.settlement('2026-10-02').subscribe();
+    const day = http.expectOne((r) => r.url === '/api/admin/settlement');
+    expect(day.request.params.get('date')).toBe('2026-10-02');
+    day.flush({});
+  });
+
+  it('runs the settlement ingest with a POST and no body', () => {
+    service.runSettlementIngest().subscribe();
+    const req = http.expectOne('/api/admin/settlement/ingest');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toBeNull();
+    req.flush({ matched: 0, disputed: 0, refused: 0 });
+  });
 });

@@ -39,7 +39,7 @@
   </ng-template>
 
   <div class="mt-5 inline-flex rounded-xl bg-slate-100 p-1 text-sm" role="tablist">
-    @for (t of [['overview', 'Overview'], ['accounts', 'Accounts'], ['security', 'Security'], ['cards', 'Card authorizations'], ['clearing', 'Clearing'], ['audit', 'Audit log']]; track t[0]) {
+    @for (t of [['overview', 'Overview'], ['accounts', 'Accounts'], ['security', 'Security'], ['cards', 'Card authorizations'], ['clearing', 'Clearing'], ['settlement', 'Settlement'], ['audit', 'Audit log']]; track t[0]) {
       <button type="button" role="tab" class="rounded-lg px-3 py-1.5 font-medium transition"
         [attr.aria-selected]="isTab($any(t[0]))" [class.bg-white]="isTab($any(t[0]))" [class.shadow-sm]="isTab($any(t[0]))"
         (click)="show($any(t[0]))">
@@ -776,6 +776,144 @@
                     <td class="px-4 py-3 font-mono">•••• {{ r.last4 }}</td>
                     <td class="px-4 py-3 text-right tabular-nums">{{ r.amount }}</td>
                     <td class="px-4 py-3 text-right font-semibold tabular-nums">{{ r.outstanding }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      } @else {
+        <p class="mt-6 text-sm text-slate-500">Loading…</p>
+      }
+    }
+    @case ('settlement') {
+      @if (settlementFailed()) {
+        <p class="alert-error mt-6" role="alert">
+          Could not load the settlement overview.
+          <button type="button" class="font-medium underline" (click)="loadSettlement()">Try again</button>
+        </p>
+      } @else if (settlement(); as s) {
+        <p class="mt-6 text-sm text-slate-600">
+          After clearing, the card network settles the day between the banks: one net amount each, labelled with a value date. This page
+          compares what was <strong>authorized</strong>, what was <strong>cleared</strong> and what was <strong>settled</strong>, from NeoBank's own
+          records. A simulation: no real settlement bank and no real card scheme.
+        </p>
+        <div class="mt-4 flex flex-wrap items-end gap-3">
+          <div>
+            <label class="label" for="settlement-date">Business day</label>
+            <select id="settlement-date" class="input" [formControl]="settlementDate">
+              <option value="">All days</option>
+              @for (d of s.businessDates; track d) {
+                <option [value]="d">{{ d }}</option>
+              }
+            </select>
+          </div>
+          <button type="button" class="rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-700 disabled:opacity-50"
+            [disabled]="settlementBusy()" (click)="ingestSettlementNow()">
+            {{ settlementBusy() ? 'Looking…' : 'Look for settlement statements now' }}
+          </button>
+        </div>
+
+        <div class="mt-4 grid gap-3 sm:grid-cols-4">
+          <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <p class="text-xs font-medium uppercase tracking-wide text-slate-400">Authorized, still open</p>
+            <p class="mt-1 text-xl font-semibold tabular-nums" data-testid="open-total">{{ s.totals.authorizedOpenAmount }}</p>
+            <p class="text-xs text-slate-500">{{ s.totals.authorizedOpen }} hold(s)</p>
+          </div>
+          <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <p class="text-xs font-medium uppercase tracking-wide text-slate-400">Cleared</p>
+            <p class="mt-1 text-xl font-semibold tabular-nums" data-testid="cleared-total">{{ s.totals.clearedAmount }}</p>
+            <p class="text-xs text-slate-500">{{ s.totals.cleared }} item(s)</p>
+          </div>
+          <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <p class="text-xs font-medium uppercase tracking-wide text-slate-400">Settled</p>
+            <p class="mt-1 text-xl font-semibold tabular-nums" data-testid="settled-total">{{ s.totals.settledAmount }}</p>
+            <p class="text-xs text-slate-500">{{ s.totals.settled }} item(s)</p>
+          </div>
+          <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <p class="text-xs font-medium uppercase tracking-wide text-slate-400">Cleared, not settled yet</p>
+            <p class="mt-1 text-xl font-semibold tabular-nums" data-testid="waiting-total">{{ s.totals.notYetSettledAmount }}</p>
+            <p class="text-xs text-slate-500">{{ s.totals.notYetSettled }} item(s): not an exception</p>
+          </div>
+        </div>
+
+        <div class="mt-4 rounded-2xl border p-4 shadow-sm" [class.border-green-200]="s.allAgree" [class.bg-green-50]="s.allAgree"
+          [class.border-amber-200]="!s.allAgree" [class.bg-amber-50]="!s.allAgree" data-testid="settlement-verdict">
+          <p class="text-sm font-semibold" [class.text-green-800]="s.allAgree" [class.text-amber-800]="!s.allAgree">
+            {{ s.allAgree ? 'Everything agrees: authorizations, clearing, settlement and the ledger.' : s.findings.length + ' difference(s) to look at.' }}
+          </p>
+          <p class="text-xs text-slate-500">Card settlement account (cleared, not yet paid out): {{ s.totals.settlementPayable }}</p>
+        </div>
+
+        @if (s.findings.length > 0) {
+          <h3 class="mt-6 text-sm font-semibold">Differences</h3>
+          <div class="mt-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <table class="w-full text-left text-sm" data-testid="findings">
+              <caption class="sr-only">Differences between authorization, clearing and settlement</caption>
+              <thead class="text-xs uppercase tracking-wide text-slate-400">
+                <tr><th class="px-4 py-3 font-medium">Kind</th><th class="px-4 py-3 font-medium">Day</th><th class="px-4 py-3 font-medium">Card</th><th class="px-4 py-3 font-medium">What happened</th></tr>
+              </thead>
+              <tbody>
+                @for (f of s.findings; track f.kind + f.businessDate + f.last4 + f.message) {
+                  <tr class="border-t border-slate-100 align-top">
+                    <td class="px-4 py-3"><span class="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800">{{ findingLabel(f.kind) }}</span></td>
+                    <td class="whitespace-nowrap px-4 py-3">{{ f.businessDate ?? '-' }}</td>
+                    <td class="px-4 py-3 font-mono">•••• {{ f.last4 }}</td>
+                    <td class="px-4 py-3">{{ f.message }}<span class="block text-xs text-slate-400">{{ f.ours }} / {{ f.theirs }}</span></td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+
+        <h3 class="mt-6 text-sm font-semibold">Settlement statements</h3>
+        @if (s.runs.length === 0) {
+          <p class="mt-2 text-sm text-slate-500" data-testid="no-runs">No settlement statement has arrived yet.</p>
+        } @else {
+          <div class="mt-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <table class="w-full text-left text-sm" data-testid="runs">
+              <caption class="sr-only">Settlement statements, newest first</caption>
+              <thead class="text-xs uppercase tracking-wide text-slate-400">
+                <tr><th class="px-4 py-3 font-medium">Run</th><th class="px-4 py-3 font-medium">Business day / value date</th><th class="px-4 py-3 text-right font-medium">Items</th><th class="px-4 py-3 text-right font-medium">NeoBank pays (-) / receives (+)</th><th class="px-4 py-3 font-medium">Status</th></tr>
+              </thead>
+              <tbody>
+                @for (r of s.runs; track r.fileName) {
+                  <tr class="border-t border-slate-100 align-top">
+                    <td class="px-4 py-3 font-mono text-xs">{{ r.runNumber ?? '-' }}<span class="block text-slate-400">{{ r.fileName }}</span></td>
+                    <td class="whitespace-nowrap px-4 py-3">{{ r.businessDate ?? '-' }} / {{ r.valueDate ?? '-' }}</td>
+                    <td class="px-4 py-3 text-right tabular-nums">{{ r.itemCount ?? '-' }}</td>
+                    <td class="px-4 py-3 text-right tabular-nums">{{ r.net ?? '-' }}
+                      @if (r.net !== null) { <span class="block text-xs text-slate-400">interchange {{ r.interchange }}, scheme fee {{ r.schemeFee }}</span> }
+                    </td>
+                    <td class="px-4 py-3">
+                      <span class="rounded-full px-2 py-0.5 text-xs font-semibold" [class.bg-green-50]="r.status === 'MATCHED'" [class.text-green-700]="r.status === 'MATCHED'"
+                        [class.bg-amber-50]="r.status === 'DISPUTED'" [class.text-amber-800]="r.status === 'DISPUTED'"
+                        [class.bg-red-50]="r.status === 'REFUSED'" [class.text-red-700]="r.status === 'REFUSED'">{{ r.status === 'MATCHED' ? 'Matched and posted' : r.status === 'DISPUTED' ? 'Disputed' : 'Refused' }}</span>
+                      @if (r.reason) { <span class="block text-xs text-slate-500">{{ r.reason }}</span> }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+
+        @if (s.notYetSettled.length > 0) {
+          <h3 class="mt-6 text-sm font-semibold">Cleared, waiting for a settlement run</h3>
+          <div class="mt-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <table class="w-full text-left text-sm" data-testid="waiting">
+              <caption class="sr-only">Cleared items not yet settled</caption>
+              <thead class="text-xs uppercase tracking-wide text-slate-400">
+                <tr><th class="px-4 py-3 font-medium">Day</th><th class="px-4 py-3 font-medium">Card</th><th class="px-4 py-3 font-medium">Merchant</th><th class="px-4 py-3 text-right font-medium">Amount</th></tr>
+              </thead>
+              <tbody>
+                @for (w of s.notYetSettled; track $index) {
+                  <tr class="border-t border-slate-100">
+                    <td class="px-4 py-3">{{ w.businessDate }}</td>
+                    <td class="px-4 py-3 font-mono">•••• {{ w.last4 }}</td>
+                    <td class="px-4 py-3">{{ w.merchantName ?? '-' }}<span class="block text-xs text-slate-400">{{ w.kind === 'REFUND' ? 'Refund' : 'Purchase' }}</span></td>
+                    <td class="px-4 py-3 text-right tabular-nums">{{ w.amount }}</td>
                   </tr>
                 }
               </tbody>

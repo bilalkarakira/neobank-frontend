@@ -16,6 +16,8 @@ import {
   Reconciliation,
   RecurringRunSummary,
   SecuritySnapshot,
+  SettlementIngestResult,
+  SettlementReport,
 } from './admin.models';
 
 @Injectable({ providedIn: 'root' })
@@ -92,6 +94,16 @@ export class AdminService {
   /** Looks for new clearing files now (the server also does it every few seconds). Audited. */
   runClearingIngest(): Observable<ClearingIngestResult> {
     return this.http.post<ClearingIngestResult>('/api/admin/clearing/ingest', null);
+  }
+
+  /** The settlement statements and the three-way reconciliation of one business day (all days when none is given). */
+  settlement(date: string): Observable<SettlementReport> {
+    return this.http.get<SettlementReport>('/api/admin/settlement', { params: date === '' ? new HttpParams() : new HttpParams().set('date', date) });
+  }
+
+  /** Looks for new settlement statements now (the server also does it every few seconds). Audited. */
+  runSettlementIngest(): Observable<SettlementIngestResult> {
+    return this.http.post<SettlementIngestResult>('/api/admin/settlement/ingest', null);
   }
 
   /** Read-only list of card authorization decisions, newest first. */

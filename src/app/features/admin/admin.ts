@@ -20,10 +20,11 @@ import {
   Overview,
   Reconciliation,
   SecuritySnapshot,
+  SettlementReport,
 } from './admin.models';
 import { AdminService } from './admin.service';
 
-type Tab = 'overview' | 'accounts' | 'customer' | 'security' | 'cards' | 'clearing' | 'audit';
+type Tab = 'overview' | 'accounts' | 'customer' | 'security' | 'cards' | 'clearing' | 'settlement' | 'audit';
 /** What an action on an account needs to show: enough to name it, whichever list it was picked from. */
 type Target = { id: string; iban: string; ownerEmail: string };
 type Pending = { account: Target; kind: 'freeze' | 'unfreeze' | 'close' };
@@ -39,6 +40,7 @@ const ACTION_LABELS: Record<string, string> = {
   RUN_INTEREST: 'Ran the interest job',
   RUN_RECURRING: 'Ran recurring payments',
   RUN_CLEARING_INGEST: 'Looked for clearing files',
+  RUN_SETTLEMENT_INGEST: 'Looked for settlement statements',
   UNLOCK_LOGIN: 'Unlocked a login',
   CLEAR_PROBING_BLOCK: 'Lifted a probing block',
   CLOSE_ACCOUNT: 'Closed account',
@@ -103,6 +105,12 @@ export class Admin {
   protected readonly clearingBusy = signal(false);
   protected readonly clearingResult = this.fb.control<ClearingResult | ''>('');
 
+  // settlement and reconciliation
+  protected readonly settlement = signal<SettlementReport | null>(null);
+  protected readonly settlementFailed = signal(false);
+  protected readonly settlementBusy = signal(false);
+  protected readonly settlementDate = this.fb.control('');
+
   // audit
   protected readonly audit = signal<AuditEntry[] | null>(null);
   protected readonly auditFailed = signal(false);
@@ -124,6 +132,7 @@ export class Admin {
       .pipe(takeUntilDestroyed())
       .subscribe(() => this.loadAccounts(0));
     this.clearingResult.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => this.loadClearing());
+    this.settlementDate.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => this.loadSettlement());
     // the card list reloads on a status change at once, and on four typed digits (or none) after a pause
     merge(this.cardFilters.controls.status.valueChanges, this.cardFilters.controls.last4.valueChanges.pipe(debounceTime(300)))
       .pipe(takeUntilDestroyed())
@@ -150,6 +159,9 @@ export class Admin {
     }
     if (tab === 'clearing') {
       this.loadClearing();
+    }
+    if (tab === 'settlement') {
+      this.loadSettlement();
     }
     if (tab === 'audit') {
       this.loadAudit();
@@ -280,6 +292,53 @@ export class Admin {
       DUPLICATE: 'Already posted',
       REJECTED: 'Rejected',
     }[result];
+  }
+
+  // ---- settlement and reconciliation ------------------------------------------------------------------------
+
+  protected loadSettlement(): void {
+    this.settlementFailed.set(false);
+    this.api.settlement(this.settlementDate.value).subscribe({
+      next: (s) => this.settlement.set(s),
+      error: () => this.settlementFailed.set(true),
+    });
+  }
+
+  /** Looks for new settlement statements now; the server also does it by itself every few seconds. */
+  protected ingestSettlementNow(): void {
+    this.settlementBusy.set(true);
+    this.error.set(null);
+    this.notice.set(null);
+    this.api.runSettlementIngest().subscribe({
+      next: (r) => {
+        this.settlementBusy.set(false);
+        this.notice.set(
+          r.matched + r.disputed + r.refused === 0
+            ? 'No new settlement statements.'
+            : `${r.matched} statement(s) matched and posted, ${r.disputed} disputed, ${r.refused} refused.`,
+        );
+        this.loadSettlement();
+      },
+      error: (err: unknown) => {
+        this.settlementBusy.set(false);
+        this.error.set(this.messageFor(err));
+      },
+    });
+  }
+
+  protected findingLabel(kind: string): string {
+    return (
+      {
+        AMOUNT_CHANGED: 'Amount changed',
+        CLEARED_WITHOUT_AUTHORIZATION: 'Cleared without approval',
+        REJECTED_AT_ISSUER: 'Rejected by NeoBank',
+        NEVER_CLEARED: 'Never cleared',
+        SETTLEMENT_DISPUTED: 'Statement disputed',
+        SETTLEMENT_REFUSED: 'Statement refused',
+        SETTLEMENT_NOT_IN_LEDGER: 'Statement not in the ledger',
+        LEDGER_MISMATCH: 'Ledger disagrees',
+      } as Record<string, string>
+    )[kind] ?? kind;
   }
 
   // ---- accounts ---------------------------------------------------------------------------------------------

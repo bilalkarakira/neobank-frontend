@@ -805,6 +805,130 @@ describe('Admin page', () => {
     expect(el.textContent).toContain('switched off on this server');
   });
 
+  // ---- settlement tab ----
+
+  const SETTLEMENT = {
+    date: '2026-10-02',
+    businessDates: ['2026-10-02', '2026-10-01'],
+    runs: [
+      { runNumber: 'S0000002', fileName: 'SETL-S0000002-999900.csv', businessDate: '2026-10-02', valueDate: '2026-10-05', status: 'DISPUTED', purchases: '10.00', refunds: '0.00', interchange: '0.13', schemeFee: '0.01', net: '-9.88', itemCount: 1, reason: 'the figures differ: interchange: file 0.13, NeoBank 0.12', receivedAt: '2026-10-06T10:05:00Z' },
+      { runNumber: 'S0000001', fileName: 'SETL-S0000001-999900.csv', businessDate: '2026-10-02', valueDate: '2026-10-05', status: 'MATCHED', purchases: '70.00', refunds: '5.00', interchange: '0.78', schemeFee: '0.04', net: '-64.26', itemCount: 3, reason: null, receivedAt: '2026-10-06T10:00:00Z' },
+      { runNumber: null, fileName: 'SETL-S0000009-999900.csv', businessDate: null, valueDate: null, status: 'REFUSED', purchases: null, refunds: null, interchange: null, schemeFee: null, net: null, itemCount: null, reason: 'the hash in the trailer does not match', receivedAt: '2026-10-06T10:07:00Z' },
+    ],
+    totals: { authorizedOpen: 1, authorizedOpenAmount: '15.00', cleared: 3, clearedAmount: '80.00', settled: 2, settledAmount: '70.00', notYetSettled: 1, notYetSettledAmount: '10.00', settlementPayable: '10.00', ledgerAgrees: true },
+    findings: [{ kind: 'AMOUNT_CHANGED', businessDate: '2026-10-02', last4: '0012', ours: 'authorized 50.00', theirs: 'cleared 57.50', message: 'Authorized for 50.00 but cleared for 57.50 (a tip or a change by the shop).' }],
+    notYetSettled: [{ businessDate: '2026-10-02', last4: '0012', kind: 'PURCHASE', amount: '10.00', merchantName: 'Corner Cafe' }],
+    allAgree: false,
+  };
+  const settlementRequest = (predicate: (p: { get(name: string): string | null }) => boolean = () => true) =>
+    http.expectOne((r) => r.method === 'GET' && r.url === '/api/admin/settlement' && predicate(r.params));
+  const openSettlement = (data: object = SETTLEMENT) => {
+    loadOverview();
+    click('Settlement');
+    settlementRequest().flush(data);
+    fixture.detectChanges();
+  };
+
+  it('shows the settlement statements, the three totals and the differences', () => {
+    openSettlement();
+
+    expect(el.querySelector('[data-testid=open-total]')!.textContent!.trim()).toBe('15.00');
+    expect(el.querySelector('[data-testid=cleared-total]')!.textContent!.trim()).toBe('80.00');
+    expect(el.querySelector('[data-testid=settled-total]')!.textContent!.trim()).toBe('70.00');
+    expect(el.querySelector('[data-testid=waiting-total]')!.textContent!.trim()).toBe('10.00');
+    expect(el.querySelector('[data-testid=settlement-verdict]')!.textContent).toContain('1 difference(s) to look at');
+    const findings = el.querySelector('[data-testid=findings]')!.textContent!;
+    expect(findings).toContain('Amount changed');
+    expect(findings).toContain('•••• 0012');
+    expect(findings).toContain('Authorized for 50.00 but cleared for 57.50');
+    const runs = el.querySelector('[data-testid=runs]')!.textContent!;
+    expect(runs).toContain('Matched and posted');
+    expect(runs).toContain('-64.26');
+    expect(runs).toContain('Disputed');
+    expect(runs).toContain('interchange: file 0.13, NeoBank 0.12');
+    expect(runs).toContain('Refused');
+    expect(el.querySelector('[data-testid=waiting]')!.textContent).toContain('Corner Cafe');
+    expect(el.querySelector('[data-testid=waiting-total]')!.parentElement!.textContent).toContain('not an exception');
+    expect(el.textContent).not.toContain('9999000000000012');
+  });
+
+  it('says everything agrees on a clean day and hides the difference and waiting tables', () => {
+    openSettlement({ ...SETTLEMENT, findings: [], notYetSettled: [], allAgree: true, runs: [SETTLEMENT.runs[1]] });
+
+    expect(el.querySelector('[data-testid=settlement-verdict]')!.textContent).toContain('Everything agrees');
+    expect(el.querySelector('[data-testid=findings]')).toBeNull();
+    expect(el.querySelector('[data-testid=waiting]')).toBeNull();
+  });
+
+  it('says so when no statement has arrived', () => {
+    openSettlement({ ...SETTLEMENT, runs: [], findings: [], allAgree: true });
+
+    expect(el.querySelector('[data-testid=no-runs]')).not.toBeNull();
+  });
+
+  it('asks the server for one business day when the day changes', () => {
+    openSettlement();
+    const select = el.querySelector<HTMLSelectElement>('#settlement-date')!;
+    expect([...select.options].map((o) => o.value)).toEqual(['', '2026-10-02', '2026-10-01']);
+    select.value = '2026-10-01';
+    select.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+
+    settlementRequest((p) => p.get('date') === '2026-10-01').flush({ ...SETTLEMENT, date: '2026-10-01', findings: [], allAgree: true });
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid=settlement-verdict]')!.textContent).toContain('Everything agrees');
+  });
+
+  it('looks for settlement statements on request and reports what happened', () => {
+    openSettlement();
+
+    click('Look for settlement statements now');
+    http.expectOne((r) => r.method === 'POST' && r.url === '/api/admin/settlement/ingest').flush({ matched: 1, disputed: 1, refused: 0 });
+    fixture.detectChanges();
+    settlementRequest().flush(SETTLEMENT);
+    fixture.detectChanges();
+
+    expect(el.textContent).toContain('1 statement(s) matched and posted, 1 disputed, 0 refused.');
+  });
+
+  it('says there is nothing new, and shows a failure of the button', () => {
+    openSettlement();
+    click('Look for settlement statements now');
+    http.expectOne((r) => r.method === 'POST' && r.url === '/api/admin/settlement/ingest').flush({ matched: 0, disputed: 0, refused: 0 });
+    settlementRequest().flush(SETTLEMENT);
+    fixture.detectChanges();
+    expect(el.textContent).toContain('No new settlement statements.');
+
+    click('Look for settlement statements now');
+    http.expectOne((r) => r.method === 'POST' && r.url === '/api/admin/settlement/ingest').flush({ title: 'x' }, { status: 500, statusText: 'Server Error' });
+    fixture.detectChanges();
+    expect(el.querySelector('[role=alert]')).not.toBeNull();
+    expect(button('Look for settlement statements now').disabled).toBe(false);
+  });
+
+  it('offers a retry when the settlement overview cannot be loaded', () => {
+    loadOverview();
+    click('Settlement');
+    settlementRequest().flush('boom', { status: 500, statusText: 'Server Error' });
+    fixture.detectChanges();
+    expect(el.textContent).toContain('Could not load the settlement overview');
+
+    click('Try again');
+    settlementRequest().flush(SETTLEMENT);
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid=runs]')).not.toBeNull();
+  });
+
+  it('labels every kind of difference in plain words', () => {
+    const kinds = ['CLEARED_WITHOUT_AUTHORIZATION', 'REJECTED_AT_ISSUER', 'NEVER_CLEARED', 'SETTLEMENT_DISPUTED', 'SETTLEMENT_REFUSED', 'SETTLEMENT_NOT_IN_LEDGER', 'LEDGER_MISMATCH', 'SOMETHING_NEW'];
+    openSettlement({ ...SETTLEMENT, findings: kinds.map((kind) => ({ kind, businessDate: null, last4: '----', ours: 'a', theirs: 'b', message: 'm' })) });
+
+    const text = el.querySelector('[data-testid=findings]')!.textContent!;
+    for (const label of ['Cleared without approval', 'Rejected by NeoBank', 'Never cleared', 'Statement disputed', 'Statement refused', 'Statement not in the ledger', 'Ledger disagrees', 'SOMETHING_NEW']) {
+      expect(text).toContain(label);
+    }
+  });
+
   const authRow = (overrides: Partial<CardAuthorizationRow> = {}): CardAuthorizationRow => ({
     id: 'r1',
     createdAt: '2026-10-05T10:00:00Z',
