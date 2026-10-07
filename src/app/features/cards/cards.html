@@ -311,7 +311,7 @@
                                 </span>
                                 <span class="text-right">
                                   <span class="block font-semibold tabular-nums">{{ number(a.amount) | currency: 'USD' }}</span>
-                                  <span class="inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                                  <span class="inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold"
                                     [class.bg-brand-50]="a.status === 'AUTHORIZED'" [class.text-brand-700]="a.status === 'AUTHORIZED'"
                                     [class.bg-red-50]="a.status === 'DECLINED'" [class.text-red-700]="a.status === 'DECLINED'"
                                     [class.bg-slate-100]="a.status !== 'AUTHORIZED' && a.status !== 'DECLINED'"

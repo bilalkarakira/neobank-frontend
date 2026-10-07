@@ -502,7 +502,7 @@ describe('Cards page', () => {
     const notes = (testId: string) => [...el.querySelector(`[data-testid=${testId}]`)!.querySelectorAll('[data-testid=increment-note]')].map((n) => n.textContent?.trim());
     expect(notes('pending')).toEqual(['Added to an earlier payment']);
     expect(notes('recent')).toEqual(['Added to an earlier payment', 'Added to an earlier payment']);
-    expect(el.querySelector('[data-testid=recent]')!.textContent).toContain('Added to the main payment');
+    expect(el.querySelector('[data-testid=recent]')!.textContent).toContain('Added to the payment');
     const posted = el.querySelector('[data-testid=posted]')!;
     expect(posted.querySelectorAll('li').length).toBe(1);
     expect(posted.textContent).toContain('$48.20');
