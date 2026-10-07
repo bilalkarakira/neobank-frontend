@@ -55,6 +55,7 @@ const authorization = (overrides: Partial<CardAuthorization> = {}): CardAuthoriz
   forced: false,
   cash: false,
   parentId: null,
+  online: false,
   ...overrides,
 });
 
@@ -79,6 +80,7 @@ const NOTHING_OWED = { total: '0.00', items: [] };
 
 const PAN = '9999000000000012';
 const PIN = '4321';
+const CVV = '731';
 
 describe('Cards page', () => {
   let http: HttpTestingController;
@@ -172,7 +174,7 @@ describe('Cards page', () => {
   it('shows a card frozen after wrong PINs with the reason and offers to unfreeze it', () => {
     loadData([card({ status: 'FROZEN', freezeReason: 'PIN_TRIES' })]);
     expect(text('card-status')).toBe('Frozen');
-    expect(text('freeze-text')).toContain('too many wrong PINs');
+    expect(text('freeze-text')).toContain('too many wrong PINs or security codes');
     expect(button('Unfreeze')).toBeTruthy();
   });
 
@@ -185,7 +187,7 @@ describe('Cards page', () => {
 
   // ---- issuing ----
 
-  const issued = (): IssuedCard => ({ card: card({ id: 'c2', last4: '0012', nickname: 'Travel' }), pan: PAN, pin: PIN });
+  const issued = (): IssuedCard => ({ card: card({ id: 'c2', last4: '0012', nickname: 'Travel' }), pan: PAN, pin: PIN, cvv: CVV });
 
   it('issues a card for a chosen account and shows the number and PIN once', () => {
     loadData([]);
@@ -202,6 +204,8 @@ describe('Cards page', () => {
 
     expect(text('revealed-pan')).toBe('9999 0000 0000 0012');
     expect(text('revealed-pin')).toBe(PIN);
+    expect(text('revealed-cvv')).toBe(CVV);
+    expect(text('reveal-use')).toContain('security code is what an online shop asks for');
     expect(el.textContent).toContain('only time');
     expect(text('masked-pan')).toBe('9999 00** **** 0012'); // the new card is in the list, masked
   });
@@ -220,6 +224,8 @@ describe('Cards page', () => {
     expect(el.textContent).not.toContain(PAN);
     expect(el.textContent).not.toContain('9999 0000 0000 0012');
     expect(el.textContent).not.toContain(PIN);
+    expect(el.querySelector('[data-testid=revealed-cvv]')).toBeNull();
+    expect(el.textContent).not.toContain(CVV);
   });
 
   it('sends no name when the field is left empty', () => {
@@ -479,6 +485,31 @@ describe('Cards page', () => {
     expect(notes('posted')).toEqual(['Cash withdrawal']);
     expect(notes('recent')).toEqual(['Cash withdrawal', 'Cash withdrawal']);
     expect(el.querySelector('[data-testid=posted] [data-posted=s2] [data-testid=cash-note]')).toBeNull();
+  });
+
+  it('marks an online payment as such in the pending, posted and recent lists, and only that one', () => {
+    loadData();
+    click('Show activity');
+    http.expectOne((r) => r.params.get('pending') === 'true').flush({
+      items: [authorization({ id: 'w1', merchantName: 'Web Shop', amount: '19.99', online: true }), authorization({ id: 's1', merchantName: 'Corner Cafe', amount: '9.00' })],
+      page: 0, size: 2, totalElements: 2,
+    });
+    http.expectOne((r) => r.params.get('page') === '0').flush({
+      items: [
+        authorization({ id: 'w1', merchantName: 'Web Shop', amount: '19.99', online: true }),
+        authorization({ id: 'w2', merchantName: 'Web Shop', amount: '30.00', status: 'CAPTURED', expiresAt: null, capturedAmount: '30.00', capturedAt: '2026-10-06T09:00:00Z', online: true }),
+        authorization({ id: 's2', merchantName: 'Corner Cafe', amount: '20.00', status: 'CAPTURED', expiresAt: null, capturedAmount: '20.00', capturedAt: '2026-10-06T09:05:00Z' }),
+      ],
+      page: 0, size: 10, totalElements: 3,
+    });
+    fixture.detectChanges();
+
+    const notes = (testId: string) => [...el.querySelector(`[data-testid=${testId}]`)!.querySelectorAll('[data-testid=online-note]')].map((n) => n.textContent?.trim());
+    expect(notes('pending')).toEqual(['Online payment']);
+    expect(notes('posted')).toEqual(['Online payment']);
+    expect(notes('recent')).toEqual(['Online payment', 'Online payment']);
+    expect(el.querySelector('[data-testid=posted] [data-posted=s2] [data-testid=online-note]')).toBeNull();
+    expect(el.querySelector('[data-testid=cash-note]')).toBeNull();
   });
 
   it('shows an addition to an earlier payment as such while pending and as merged once the payment cleared', () => {

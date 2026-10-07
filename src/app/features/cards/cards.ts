@@ -81,7 +81,7 @@ export class Cards {
   protected readonly showIssue = signal(false);
   protected readonly issuing = signal(false);
   protected readonly issueError = signal<string | null>(null);
-  /** The number and PIN of a card just issued. Held in memory only, and gone as soon as it is dismissed. */
+  /** The number, PIN and security code of a card just issued. Held in memory only, and gone as soon as it is dismissed. */
   protected readonly revealed = signal<IssuedCard | null>(null);
   protected readonly copied = signal<string | null>(null);
 
@@ -164,7 +164,7 @@ export class Cards {
     });
   }
 
-  /** After this the number and PIN cannot be shown again, by anyone. */
+  /** After this the number, PIN and security code cannot be shown again, by anyone. */
   protected dismissReveal(): void {
     this.revealed.set(null);
     this.copied.set(null);
@@ -432,7 +432,7 @@ export class Cards {
   protected freezeText(card: Card): string {
     switch (card.freezeReason) {
       case 'PIN_TRIES':
-        return 'Frozen after too many wrong PINs';
+        return 'Frozen after too many wrong PINs or security codes';
       case 'ADMIN':
         return 'Frozen by the bank';
       default:

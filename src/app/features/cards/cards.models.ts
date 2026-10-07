@@ -28,6 +28,8 @@ export interface IssuedCard {
   card: Card;
   pan: string;
   pin: string;
+  /** The security code printed on the card, for online payments. */
+  cvv: string;
 }
 
 export interface IssueCardRequest {
@@ -57,6 +59,8 @@ export interface CardAuthorization {
   cash: boolean;
   /** Set when this is an addition to an earlier payment (a pump that topped up): the first authorization it adds to. */
   parentId: string | null;
+  /** A payment without the card present (an online shop). */
+  online: boolean;
 }
 
 /** What the customer owes the bank because a cleared card payment was more than their account could cover. */
