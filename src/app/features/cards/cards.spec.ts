@@ -4,7 +4,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { Account } from '../accounts/accounts.models';
 import { Card, CardAuthorization, Dispute, IssuedCard, PendingAuthentication } from './cards.models';
-import { Cards, disputeAmountValidator, limitValidator } from './cards';
+import { APPROVAL_REFRESH_MS, Cards, disputeAmountValidator, limitValidator } from './cards';
 import { FormControl } from '@angular/forms';
 
 const account = (overrides: Partial<Account> = {}): Account => ({
@@ -958,5 +958,121 @@ describe('limitValidator', () => {
   it('leaves an empty value to the required rule', () => {
     expect(check('')).toBeNull();
     expect(check('  ')).toBeNull();
+  });
+});
+
+describe('Cards page: online payments refresh by themselves', () => {
+  let http: HttpTestingController;
+  let fixture: ComponentFixture<Cards>;
+  let el: HTMLElement;
+
+  // fake timers must be installed BEFORE the page is created: it starts its timer when it is built
+  beforeEach(() => {
+    vi.useFakeTimers();
+    TestBed.configureTestingModule({
+      imports: [Cards],
+      providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
+    });
+    http = TestBed.inject(HttpTestingController);
+    fixture = TestBed.createComponent(Cards);
+    el = fixture.nativeElement as HTMLElement;
+    fixture.detectChanges();
+  });
+
+  afterEach(() => {
+    http.match('/api/cards/owed').forEach((r) => r.flush(NOTHING_OWED));
+    http.match('/api/cards/disputes').forEach((r) => r.flush([]));
+    http.verify();
+    vi.useRealTimers();
+  });
+
+  /** Answers everything the page asks for when it opens; the requests waiting for approval are `first`. */
+  const start = (first: PendingAuthentication[]) => {
+    http.expectOne('/api/cards/authentications').flush(first);
+    http.expectOne('/api/cards').flush([card()]);
+    http.expectOne('/api/accounts').flush([account()]);
+    http.match('/api/cards/owed').forEach((r) => r.flush(NOTHING_OWED));
+    http.match('/api/cards/disputes').forEach((r) => r.flush([]));
+    fixture.detectChanges();
+  };
+  const tick = (ms: number) => vi.advanceTimersByTime(ms);
+
+  it('asks every five seconds', () => {
+    expect(APPROVAL_REFRESH_MS).toBe(5000);
+    start([]);
+  });
+
+  it('shows a request that arrives while the page is open, without reopening it', () => {
+    start([]);
+    expect(el.querySelector('[data-testid=approvals]')).toBeNull();
+
+    tick(APPROVAL_REFRESH_MS);
+    http.expectOne('/api/cards/authentications').flush([waiting()]);
+    fixture.detectChanges();
+
+    expect(el.querySelectorAll('[data-testid=approval]').length).toBe(1);
+    expect(el.querySelector('[data-testid=approval-reference]')!.textContent).toBe('K7M2QX');
+  });
+
+  it('does not ask before the interval has passed, and asks again after every interval', () => {
+    start([]);
+
+    tick(APPROVAL_REFRESH_MS - 1);
+    http.expectNone('/api/cards/authentications');
+    tick(1);
+    http.expectOne('/api/cards/authentications').flush([]);
+    tick(APPROVAL_REFRESH_MS);
+    http.expectOne('/api/cards/authentications').flush([]);
+  });
+
+  it('makes a request that was answered elsewhere disappear', () => {
+    start([waiting()]);
+    expect(el.querySelectorAll('[data-testid=approval]').length).toBe(1);
+
+    tick(APPROVAL_REFRESH_MS);
+    http.expectOne('/api/cards/authentications').flush([]);
+    fixture.detectChanges();
+
+    expect(el.querySelector('[data-testid=approvals]')).toBeNull();
+  });
+
+  it('keeps what it shows when a refresh fails', () => {
+    start([waiting()]);
+
+    tick(APPROVAL_REFRESH_MS);
+    http.expectOne('/api/cards/authentications').flush(null, { status: 500, statusText: 'Server Error' });
+    fixture.detectChanges();
+
+    expect(el.querySelectorAll('[data-testid=approval]').length).toBe(1);
+  });
+
+  it('does not refresh while an answer is being sent', () => {
+    start([waiting()]);
+    el.querySelectorAll<HTMLButtonElement>('[data-testid=approval] button')[0].click();
+    const answer = http.expectOne('/api/cards/authentications/au1/approve');
+
+    tick(APPROVAL_REFRESH_MS * 2);
+    http.expectNone('/api/cards/authentications');
+    answer.flush(null, { status: 204, statusText: 'No Content' });
+  });
+
+  it('does not refresh while the page is hidden, and carries on when it is visible again', () => {
+    start([]);
+    const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(true);
+
+    tick(APPROVAL_REFRESH_MS * 2);
+    http.expectNone('/api/cards/authentications');
+    hidden.mockReturnValue(false);
+    tick(APPROVAL_REFRESH_MS);
+    http.expectOne('/api/cards/authentications').flush([]);
+    hidden.mockRestore();
+  });
+
+  it('stops asking once the page is left', () => {
+    start([]);
+
+    fixture.destroy();
+    tick(APPROVAL_REFRESH_MS * 3);
+    http.expectNone('/api/cards/authentications');
   });
 });

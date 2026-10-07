@@ -1,6 +1,6 @@
 import { CurrencyPipe, DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { AbstractControl, FormBuilder, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { ApiProblem } from '../../core/auth/auth.models';
@@ -59,6 +59,9 @@ const STATUS_LABELS: Record<AuthorizationStatus, string> = {
   CAPTURED: 'Posted',
   MERGED: 'Added to the payment',
 };
+
+/** How often the page asks the bank for requests that wait for the customer's answer. */
+export const APPROVAL_REFRESH_MS = 5000;
 
 @Component({
   selector: 'app-cards',
@@ -124,6 +127,13 @@ export class Cards {
 
   constructor() {
     this.load();
+    // a request from a shop appears without reopening the page: ask again every few seconds while the page is open and visible
+    const refresh = setInterval(() => {
+      if (!document.hidden && !this.answering()) {
+        this.loadApprovals();
+      }
+    }, APPROVAL_REFRESH_MS);
+    inject(DestroyRef).onDestroy(() => clearInterval(refresh));
   }
 
   protected load(): void {
