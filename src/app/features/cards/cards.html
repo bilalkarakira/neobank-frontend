@@ -236,7 +236,7 @@
                           <ul class="mt-2 divide-y divide-slate-100 rounded-xl border border-slate-200" data-testid="posted">
                             @for (a of posted(state.recent); track a.id) {
                               <li class="flex flex-wrap items-center justify-between gap-3 px-3 py-2 text-sm" [attr.data-posted]="a.id">
-                                <span>
+                                <span class="min-w-0 flex-1">
                                   <span class="font-medium">{{ a.merchantName ?? 'Card payment' }}</span>
                                   <span class="block text-xs text-slate-500">{{ a.capturedAt ?? a.createdAt | date: 'medium' }}</span>
                                   @if (changed(a)) {

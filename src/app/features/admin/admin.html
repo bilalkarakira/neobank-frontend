@@ -38,9 +38,9 @@
     }
   </ng-template>
 
-  <div class="mt-5 inline-flex rounded-xl bg-slate-100 p-1 text-sm" role="tablist">
+  <div class="mt-5 flex max-w-full overflow-x-auto rounded-xl bg-slate-100 p-1 text-sm sm:inline-flex" role="tablist">
     @for (t of [['overview', 'Overview'], ['accounts', 'Accounts'], ['security', 'Security'], ['cards', 'Card authorizations'], ['clearing', 'Clearing'], ['settlement', 'Settlement'], ['disputes', 'Disputes'], ['audit', 'Audit log']]; track t[0]) {
-      <button type="button" role="tab" class="rounded-lg px-3 py-1.5 font-medium transition"
+      <button type="button" role="tab" class="shrink-0 whitespace-nowrap rounded-lg px-3 py-1.5 font-medium transition"
         [attr.aria-selected]="isTab($any(t[0]))" [class.bg-white]="isTab($any(t[0]))" [class.shadow-sm]="isTab($any(t[0]))"
         (click)="show($any(t[0]))">
         {{ t[1] }}
