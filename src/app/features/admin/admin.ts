@@ -17,6 +17,7 @@ import {
   CardAuthorizationPage,
   ClearingOverview,
   ClearingResult,
+  DisputeOverview,
   Overview,
   Reconciliation,
   SecuritySnapshot,
@@ -24,7 +25,7 @@ import {
 } from './admin.models';
 import { AdminService } from './admin.service';
 
-type Tab = 'overview' | 'accounts' | 'customer' | 'security' | 'cards' | 'clearing' | 'settlement' | 'audit';
+type Tab = 'overview' | 'accounts' | 'customer' | 'security' | 'cards' | 'clearing' | 'settlement' | 'disputes' | 'audit';
 /** What an action on an account needs to show: enough to name it, whichever list it was picked from. */
 type Target = { id: string; iban: string; ownerEmail: string };
 type Pending = { account: Target; kind: 'freeze' | 'unfreeze' | 'close' };
@@ -41,6 +42,7 @@ const ACTION_LABELS: Record<string, string> = {
   RUN_RECURRING: 'Ran recurring payments',
   RUN_CLEARING_INGEST: 'Looked for clearing files',
   RUN_SETTLEMENT_INGEST: 'Looked for settlement statements',
+  CLOSE_DISPUTES: 'Closed disputes whose time ran out',
   UNLOCK_LOGIN: 'Unlocked a login',
   CLEAR_PROBING_BLOCK: 'Lifted a probing block',
   CLOSE_ACCOUNT: 'Closed account',
@@ -111,6 +113,11 @@ export class Admin {
   protected readonly settlementBusy = signal(false);
   protected readonly settlementDate = this.fb.control('');
 
+  // disputes
+  protected readonly disputes = signal<DisputeOverview | null>(null);
+  protected readonly disputesFailed = signal(false);
+  protected readonly disputesBusy = signal(false);
+
   // audit
   protected readonly audit = signal<AuditEntry[] | null>(null);
   protected readonly auditFailed = signal(false);
@@ -162,6 +169,9 @@ export class Admin {
     }
     if (tab === 'settlement') {
       this.loadSettlement();
+    }
+    if (tab === 'disputes') {
+      this.loadDisputes();
     }
     if (tab === 'audit') {
       this.loadAudit();
@@ -291,7 +301,43 @@ export class Admin {
       REFUND_POSTED: 'Refund posted',
       DUPLICATE: 'Already posted',
       REJECTED: 'Rejected',
+      CHARGEBACK_SENT: 'Chargeback sent',
+      CHARGEBACK_POSTED: 'Chargeback accepted',
+      CHARGEBACK_REFUSED: 'Chargeback refused',
+      REPRESENTMENT_POSTED: 'Shop answered, customer debited again',
     }[result];
+  }
+
+  // ---- disputes ---------------------------------------------------------------------------------------------
+
+  protected loadDisputes(): void {
+    this.disputesFailed.set(false);
+    this.api.disputes().subscribe({
+      next: (d) => this.disputes.set(d),
+      error: () => this.disputesFailed.set(true),
+    });
+  }
+
+  /** Closes the disputes whose answer window has passed, now; the server also does it by itself every few seconds. */
+  protected closeDisputesNow(): void {
+    this.disputesBusy.set(true);
+    this.error.set(null);
+    this.notice.set(null);
+    this.api.closeDueDisputes().subscribe({
+      next: (r) => {
+        this.disputesBusy.set(false);
+        this.notice.set(r.closed === 0 ? 'No dispute is due to be closed.' : `${r.closed} dispute(s) closed as won.`);
+        this.loadDisputes();
+      },
+      error: (err: unknown) => {
+        this.disputesBusy.set(false);
+        this.error.set(this.messageFor(err));
+      },
+    });
+  }
+
+  protected disputeStatusLabel(status: string): string {
+    return { FILED: 'Sent to the network', OPEN: 'Waiting for the shop', WON: 'Won by the customer', LOST: 'Lost by the customer' }[status] ?? status;
   }
 
   // ---- settlement and reconciliation ------------------------------------------------------------------------
@@ -337,6 +383,9 @@ export class Admin {
         SETTLEMENT_REFUSED: 'Statement refused',
         SETTLEMENT_NOT_IN_LEDGER: 'Statement not in the ledger',
         LEDGER_MISMATCH: 'Ledger disagrees',
+        CHARGEBACK_REFUSED: 'Chargeback refused',
+        LATE_REPRESENTMENT: 'Answer after the dispute was won',
+        DISPUTE_OPEN_TOO_LONG: 'Dispute open too long',
       } as Record<string, string>
     )[kind] ?? kind;
   }

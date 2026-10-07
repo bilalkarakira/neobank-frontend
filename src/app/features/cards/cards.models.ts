@@ -61,6 +61,36 @@ export interface Owed {
   items: { accountId: string; amount: string; outstanding: string; createdAt: string }[];
 }
 
+export type DisputeReason = 'UNAUTHORIZED' | 'NOT_RECEIVED' | 'DUPLICATE' | 'WRONG_AMOUNT' | 'OTHER';
+
+/** FILED: credit given, waiting for the card network; OPEN: the shop may answer; WON: the credit is final; LOST: it was taken back. */
+export type DisputeStatus = 'FILED' | 'OPEN' | 'WON' | 'LOST';
+
+export interface Dispute {
+  id: string;
+  authorizationId: string;
+  merchantName: string | null;
+  last4: string;
+  amount: string;
+  reason: DisputeReason;
+  note: string | null;
+  status: DisputeStatus;
+  /** Why it ended, in a sentence; null while it is still running. */
+  outcome: string | null;
+  filedAt: string;
+  openedAt: string | null;
+  closedAt: string | null;
+  /** While OPEN: when the shop's time to answer ends and the credit becomes final. */
+  answerDueAt: string | null;
+}
+
+/** {@code amount} null disputes the whole payment. */
+export interface DisputeRequest {
+  reason: DisputeReason;
+  note: string | null;
+  amount: string | null;
+}
+
 export interface AuthorizationPage {
   items: CardAuthorization[];
   page: number;

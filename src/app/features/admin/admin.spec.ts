@@ -2,7 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Admin } from './admin';
-import { AdminAccount, AdminAccountPage, AuditEntry, CardAuthorizationPage, CardAuthorizationRow, CustomerDetail, Overview, Reconciliation, SecuritySnapshot } from './admin.models';
+import { AdminAccount, AdminAccountPage, AuditEntry, CardAuthorizationPage, CardAuthorizationRow, CustomerDetail, DisputeOverview, Overview, Reconciliation, SecuritySnapshot } from './admin.models';
 
 const OVERVIEW: Overview = {
   generatedAt: '2026-10-04T12:00:00Z',
@@ -789,6 +789,93 @@ describe('Admin page', () => {
     fixture.detectChanges();
     expect(el.querySelector('[role=alert]')).not.toBeNull();
     expect(button('Look for clearing files now').disabled).toBe(false);
+  });
+
+  // ---- disputes ----
+
+  const DISPUTES: DisputeOverview = {
+    windowSeconds: 30,
+    filed: 1,
+    open: 1,
+    won: 1,
+    lost: 1,
+    disputes: [
+      { id: 'd1', email: 'alice@example.com', merchantName: 'Corner Cafe', last4: '0012', amount: '40.00', reason: 'UNAUTHORIZED', note: 'not me', status: 'FILED', outcome: null, lateRepresentment: false, filedAt: '2026-10-07T10:00:00Z', openedAt: null, closedAt: null },
+      { id: 'd2', email: 'bob@example.com', merchantName: 'Gas Station', last4: '0020', amount: '12.50', reason: 'DUPLICATE', note: null, status: 'OPEN', outcome: null, lateRepresentment: false, filedAt: '2026-10-07T09:00:00Z', openedAt: '2026-10-07T09:01:00Z', closedAt: null },
+      { id: 'd3', email: 'carol@example.com', merchantName: 'Kiosk', last4: '0031', amount: '5.00', reason: 'OTHER', note: null, status: 'WON', outcome: 'The shop did not answer in time: your credit is final.', lateRepresentment: false, filedAt: '2026-10-06T09:00:00Z', openedAt: '2026-10-06T09:01:00Z', closedAt: '2026-10-06T09:02:00Z' },
+      { id: 'd4', email: 'dave@example.com', merchantName: 'Bakery', last4: '0042', amount: '8.00', reason: 'NOT_RECEIVED', note: null, status: 'LOST', outcome: 'The shop answered with evidence: receipt', lateRepresentment: true, filedAt: '2026-10-05T09:00:00Z', openedAt: '2026-10-05T09:01:00Z', closedAt: '2026-10-07T09:02:00Z' },
+    ],
+  };
+  const disputesRequest = () => http.expectOne((r) => r.method === 'GET' && r.url === '/api/admin/disputes');
+  const openDisputes = (data: DisputeOverview = DISPUTES) => {
+    loadOverview();
+    click('Disputes');
+    disputesRequest().flush(data);
+    fixture.detectChanges();
+  };
+
+  it('shows the counts and every dispute with its state in words and a note for a late answer', () => {
+    openDisputes();
+
+    const counts = el.querySelector('[data-testid=dispute-counts]')!.textContent!.replace(/\s+/g, ' ');
+    for (const part of ['Sent to the network: 1', 'Waiting for the shop: 1', 'Won: 1', 'Lost: 1']) {
+      expect(counts).toContain(part);
+    }
+    const rows = [...el.querySelectorAll('[data-testid=disputes-table] tbody tr')].map((r) => r.textContent!.replace(/\s+/g, ' ').trim());
+    expect(rows.length).toBe(4);
+    expect(rows[0]).toContain('alice@example.com');
+    expect(rows[0]).toContain('•••• 0012');
+    expect(rows[0]).toContain('$40.00');
+    expect(rows[0]).toContain('Sent to the network');
+    expect(rows[1]).toContain('Waiting for the shop');
+    expect(rows[2]).toContain('Won by the customer');
+    expect(rows[3]).toContain('Lost by the customer');
+    expect(el.querySelectorAll('[data-testid=late-note]').length).toBe(1);
+    expect(el.textContent).toContain('within 30 seconds');
+    expect(el.textContent).not.toContain('9999');
+  });
+
+  it('says so when no dispute has been filed', () => {
+    openDisputes({ windowSeconds: 1209600, filed: 0, open: 0, won: 0, lost: 0, disputes: [] });
+    expect(el.querySelector('[data-testid=no-disputes]')).not.toBeNull();
+    expect(el.querySelector('[data-testid=disputes-table]')).toBeNull();
+  });
+
+  it('closes the due disputes on request and reports how many', () => {
+    openDisputes();
+
+    click('Close the disputes that are due now');
+    http.expectOne((r) => r.method === 'POST' && r.url === '/api/admin/disputes/close-due').flush({ closed: 2 });
+    fixture.detectChanges();
+    disputesRequest().flush(DISPUTES);
+    fixture.detectChanges();
+    expect(el.textContent).toContain('2 dispute(s) closed as won.');
+
+    click('Close the disputes that are due now');
+    http.expectOne((r) => r.method === 'POST' && r.url === '/api/admin/disputes/close-due').flush({ closed: 0 });
+    fixture.detectChanges();
+    disputesRequest().flush(DISPUTES);
+    fixture.detectChanges();
+    expect(el.textContent).toContain('No dispute is due to be closed.');
+
+    click('Close the disputes that are due now');
+    http.expectOne((r) => r.method === 'POST' && r.url === '/api/admin/disputes/close-due').flush({ title: 'x' }, { status: 500, statusText: 'Server Error' });
+    fixture.detectChanges();
+    expect(el.querySelector('[role=alert]')).not.toBeNull();
+    expect(button('Close the disputes that are due now').disabled).toBe(false);
+  });
+
+  it('offers a retry when the disputes cannot be loaded', () => {
+    loadOverview();
+    click('Disputes');
+    disputesRequest().flush('boom', { status: 500, statusText: 'Server Error' });
+    fixture.detectChanges();
+    expect(el.textContent).toContain('Could not load the disputes');
+
+    click('Try again');
+    disputesRequest().flush(DISPUTES);
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid=disputes-table]')).not.toBeNull();
   });
 
   it('offers a retry when the clearing overview cannot be loaded, and disables the button when the job is off', () => {

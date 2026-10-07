@@ -154,4 +154,19 @@ describe('AdminService', () => {
     expect(req.request.body).toBeNull();
     req.flush({ matched: 0, disputed: 0, refused: 0 });
   });
+
+  it('asks for the disputes with a GET', () => {
+    service.disputes().subscribe();
+    const req = http.expectOne('/api/admin/disputes');
+    expect(req.request.method).toBe('GET');
+    req.flush({});
+  });
+
+  it('closes the due disputes with a POST and no body', () => {
+    service.closeDueDisputes().subscribe((r) => expect(r.closed).toBe(2));
+    const req = http.expectOne('/api/admin/disputes/close-due');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toBeNull();
+    req.flush({ closed: 2 });
+  });
 });

@@ -29,6 +29,19 @@ describe('CardsService', () => {
     req.flush({ total: '5.50', items: [] });
   });
 
+  it('lists the disputes and files one for a payment', () => {
+    service.disputes().subscribe((list) => expect(list.length).toBe(1));
+    const list = http.expectOne('/api/cards/disputes');
+    expect(list.request.method).toBe('GET');
+    list.flush([{ id: 'd1' }]);
+
+    service.fileDispute('p1', { reason: 'OTHER', note: null, amount: '5.00' }).subscribe();
+    const req = http.expectOne('/api/cards/payments/p1/dispute');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ reason: 'OTHER', note: null, amount: '5.00' });
+    req.flush({});
+  });
+
   it('issues a card with the account and the optional name', () => {
     service.issue({ accountId: 'a1', nickname: null }).subscribe();
     const req = http.expectOne('/api/cards');

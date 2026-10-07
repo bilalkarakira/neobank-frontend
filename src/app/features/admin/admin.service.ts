@@ -8,9 +8,11 @@ import {
   CardAuthStatus,
   CardAuthorizationPage,
   ClearingIngestResult,
+  CloseDisputesResult,
   ClearingOverview,
   ClearingResult,
   CustomerDetail,
+  DisputeOverview,
   InterestRunSummary,
   Overview,
   Reconciliation,
@@ -104,6 +106,16 @@ export class AdminService {
   /** Looks for new settlement statements now (the server also does it every few seconds). Audited. */
   runSettlementIngest(): Observable<SettlementIngestResult> {
     return this.http.post<SettlementIngestResult>('/api/admin/settlement/ingest', null);
+  }
+
+  /** Every card dispute with its state, and how many are in each state. */
+  disputes(): Observable<DisputeOverview> {
+    return this.http.get<DisputeOverview>('/api/admin/disputes');
+  }
+
+  /** Closes the disputes whose answer window has passed, now (the server also does it every few seconds). Audited. */
+  closeDueDisputes(): Observable<CloseDisputesResult> {
+    return this.http.post<CloseDisputesResult>('/api/admin/disputes/close-due', null);
   }
 
   /** Read-only list of card authorization decisions, newest first. */

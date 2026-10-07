@@ -1,7 +1,7 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import { AuthorizationPage, Card, IssueCardRequest, IssuedCard, Owed } from './cards.models';
+import { AuthorizationPage, Card, Dispute, DisputeRequest, IssueCardRequest, IssuedCard, Owed } from './cards.models';
 
 @Injectable({ providedIn: 'root' })
 export class CardsService {
@@ -36,6 +36,16 @@ export class CardsService {
   /** What the signed-in customer owes the bank after a cleared card payment that was bigger than their account could cover. */
   owed(): Observable<Owed> {
     return this.http.get<Owed>('/api/cards/owed');
+  }
+
+  /** The signed-in customer's disputes, newest first. */
+  disputes(): Observable<Dispute[]> {
+    return this.http.get<Dispute[]>(`${this.base}/disputes`);
+  }
+
+  /** Disputes a posted payment: the bank credits the amount for now and sends a chargeback through the network. */
+  fileDispute(authorizationId: string, request: DisputeRequest): Observable<Dispute> {
+    return this.http.post<Dispute>(`${this.base}/payments/${authorizationId}/dispute`, request);
   }
 
   /** Holds that still reserve money. */

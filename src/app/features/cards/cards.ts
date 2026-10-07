@@ -7,7 +7,7 @@ import { ApiProblem } from '../../core/auth/auth.models';
 import { accountTitle } from '../accounts/account-title';
 import { Account } from '../accounts/accounts.models';
 import { AccountsService } from '../accounts/accounts.service';
-import { AuthorizationStatus, Card, CardAuthorization, IssuedCard, Owed } from './cards.models';
+import { AuthorizationStatus, Card, CardAuthorization, Dispute, DisputeReason, IssuedCard, Owed } from './cards.models';
 import { CardsService } from './cards.service';
 
 export const MAX_DAILY_LIMIT = 5000;
@@ -25,6 +25,26 @@ export function limitValidator(control: AbstractControl<string>): ValidationErro
   const number = Number(value);
   return number < 0.01 || number > MAX_DAILY_LIMIT ? { range: true } : null;
 }
+
+/** Empty means "the whole payment"; otherwise a positive amount with at most two decimals. The server checks the upper limit. */
+export function disputeAmountValidator(control: AbstractControl<string>): ValidationErrors | null {
+  const value = control.value.trim();
+  if (value === '') {
+    return null;
+  }
+  if (!/^\d{1,10}(\.\d{1,2})?$/.test(value)) {
+    return { format: true };
+  }
+  return Number(value) <= 0 ? { range: true } : null;
+}
+
+export const DISPUTE_REASONS: { value: DisputeReason; label: string }[] = [
+  { value: 'UNAUTHORIZED', label: 'I did not make this payment' },
+  { value: 'NOT_RECEIVED', label: 'I did not receive what I paid for' },
+  { value: 'DUPLICATE', label: 'I was charged twice' },
+  { value: 'WRONG_AMOUNT', label: 'The amount is wrong' },
+  { value: 'OTHER', label: 'Something else' },
+];
 
 type ActivityState =
   | { status: 'loading' }
@@ -76,6 +96,18 @@ export class Cards {
   protected readonly activity = signal<Record<string, ActivityState>>({});
   protected readonly owed = signal<Owed | null>(null);
 
+  protected readonly disputes = signal<Dispute[]>([]);
+  /** The posted payment whose dispute form is open. */
+  protected readonly disputing = signal<string | null>(null);
+  protected readonly disputeBusy = signal(false);
+  protected readonly disputeError = signal<string | null>(null);
+  protected readonly disputeReasons = DISPUTE_REASONS;
+  protected readonly disputeForm = this.fb.group({
+    reason: ['', Validators.required],
+    amount: ['', disputeAmountValidator],
+    note: ['', Validators.maxLength(200)],
+  });
+
   protected readonly title = accountTitle;
   protected readonly maxLimit = MAX_DAILY_LIMIT;
 
@@ -91,6 +123,7 @@ export class Cards {
   protected load(): void {
     // a nicety next to the cards: if it cannot be loaded the page simply shows no debt line
     this.api.owed().subscribe({ next: (o) => this.owed.set(o), error: () => undefined });
+    this.api.disputes().subscribe({ next: (list) => this.disputes.set(list), error: () => undefined });
     this.loadFailed.set(false);
     this.api.list().subscribe({
       next: (list) => this.cards.set(list),
@@ -301,6 +334,88 @@ export class Cards {
   /** The cleared (posted) payments among the shown ones, newest first. */
   protected posted(items: CardAuthorization[]): CardAuthorization[] {
     return items.filter((a) => a.status === 'CAPTURED');
+  }
+
+  // ---- disputes ----------------------------------------------------------------------------------------------
+
+  /** The dispute of a posted payment, if it has one (a payment can be disputed once). */
+  protected disputeFor(a: CardAuthorization): Dispute | undefined {
+    return this.disputes().find((d) => d.authorizationId === a.id);
+  }
+
+  protected startDispute(a: CardAuthorization): void {
+    this.disputeError.set(null);
+    this.disputeForm.reset({ reason: '', amount: '', note: '' });
+    this.disputing.set(a.id);
+  }
+
+  protected cancelDispute(): void {
+    this.disputing.set(null);
+    this.disputeError.set(null);
+  }
+
+  protected submitDispute(a: CardAuthorization): void {
+    if (this.disputeForm.invalid || this.disputeBusy()) {
+      this.disputeForm.markAllAsTouched();
+      return;
+    }
+    const { reason, amount, note } = this.disputeForm.getRawValue();
+    const posted = a.capturedAmount ?? a.amount;
+    if (amount.trim() !== '' && Number(amount) > Number(posted)) {
+      this.disputeError.set(`The amount can be at most ${posted}, the amount of the payment.`);
+      return;
+    }
+    this.disputeBusy.set(true);
+    this.disputeError.set(null);
+    this.api
+      .fileDispute(a.id, { reason: reason as DisputeReason, note: note.trim() === '' ? null : note.trim(), amount: amount.trim() === '' ? null : amount.trim() })
+      .subscribe({
+        next: (d) => {
+          this.disputeBusy.set(false);
+          this.disputing.set(null);
+          this.disputes.update((list) => [d, ...list]);
+          this.notice.set(`Dispute filed. ${d.amount} USD was credited to your account for now while the card network looks into it.`);
+          this.api.list().subscribe({ next: (list) => this.cards.set(list), error: () => undefined }); // the balance changed
+        },
+        error: (err: unknown) => {
+          this.disputeBusy.set(false);
+          this.disputeError.set(this.disputeMessage(err));
+        },
+      });
+  }
+
+  private disputeMessage(err: unknown): string {
+    if (err instanceof HttpErrorResponse) {
+      const problem = err.error as ApiProblem | null;
+      if (err.status === 404) {
+        return 'That payment was not found.';
+      }
+      if (err.status === 422) {
+        return problem?.detail ?? 'This payment cannot be disputed.';
+      }
+      if (err.status === 400) {
+        return 'Please check the details and try again.';
+      }
+    }
+    return 'We could not file the dispute. Please try again.';
+  }
+
+  /** What a dispute's state means for the customer, in words. */
+  protected disputeText(d: Dispute): string {
+    switch (d.status) {
+      case 'FILED':
+        return 'Sent to the card network, waiting for its answer';
+      case 'OPEN':
+        return 'Under review: the shop can still answer';
+      case 'WON':
+        return 'Won: the credit is final';
+      default:
+        return 'Lost: the credit was taken back';
+    }
+  }
+
+  protected reasonLabel(reason: DisputeReason): string {
+    return DISPUTE_REASONS.find((r) => r.value === reason)?.label ?? reason;
   }
 
   /** True when what was posted differs from what was authorized (a tip, or an amount the shop changed). */

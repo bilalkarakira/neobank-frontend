@@ -39,7 +39,7 @@
   </ng-template>
 
   <div class="mt-5 inline-flex rounded-xl bg-slate-100 p-1 text-sm" role="tablist">
-    @for (t of [['overview', 'Overview'], ['accounts', 'Accounts'], ['security', 'Security'], ['cards', 'Card authorizations'], ['clearing', 'Clearing'], ['settlement', 'Settlement'], ['audit', 'Audit log']]; track t[0]) {
+    @for (t of [['overview', 'Overview'], ['accounts', 'Accounts'], ['security', 'Security'], ['cards', 'Card authorizations'], ['clearing', 'Clearing'], ['settlement', 'Settlement'], ['disputes', 'Disputes'], ['audit', 'Audit log']]; track t[0]) {
       <button type="button" role="tab" class="rounded-lg px-3 py-1.5 font-medium transition"
         [attr.aria-selected]="isTab($any(t[0]))" [class.bg-white]="isTab($any(t[0]))" [class.shadow-sm]="isTab($any(t[0]))"
         (click)="show($any(t[0]))">
@@ -727,6 +727,10 @@
               <option value="REFUND_POSTED">Refund posted</option>
               <option value="DUPLICATE">Already posted</option>
               <option value="REJECTED">Rejected</option>
+              <option value="CHARGEBACK_SENT">Chargeback sent</option>
+              <option value="CHARGEBACK_POSTED">Chargeback accepted</option>
+              <option value="CHARGEBACK_REFUSED">Chargeback refused</option>
+              <option value="REPRESENTMENT_POSTED">Shop answered, customer debited again</option>
             </select>
           </div>
         </div>
@@ -924,6 +928,61 @@
         <p class="mt-6 text-sm text-slate-500">Loading…</p>
       }
     }
+    @case ('disputes') {
+      @if (disputesFailed()) {
+        <p class="alert-error mt-6" role="alert">
+          Could not load the disputes.
+          <button type="button" class="font-medium underline" (click)="loadDisputes()">Try again</button>
+        </p>
+      } @else if (disputes(); as d) {
+        <p class="mt-6 text-sm text-slate-500">
+          A customer disputes a posted card payment, the bank credits the amount for now and sends a chargeback through the card network. If the shop
+          does not answer within {{ d.windowSeconds }} seconds of the network accepting it, the customer wins and the credit is final; if it answers
+          with evidence, the customer is debited again and loses. A simulation: no arbitration and no real card scheme.
+        </p>
+        <div class="mt-4 flex flex-wrap items-center gap-4 text-sm" data-testid="dispute-counts">
+          <span>Sent to the network: <strong class="tabular-nums">{{ d.filed }}</strong></span>
+          <span>Waiting for the shop: <strong class="tabular-nums">{{ d.open }}</strong></span>
+          <span>Won: <strong class="tabular-nums">{{ d.won }}</strong></span>
+          <span>Lost: <strong class="tabular-nums">{{ d.lost }}</strong></span>
+          <button type="button" class="btn-primary w-auto px-4" [disabled]="disputesBusy()" (click)="closeDisputesNow()">
+            {{ disputesBusy() ? 'Closing…' : 'Close the disputes that are due now' }}
+          </button>
+        </div>
+        @if (d.disputes.length === 0) {
+          <p class="mt-4 text-sm text-slate-500" data-testid="no-disputes">No dispute has been filed yet.</p>
+        } @else {
+          <div class="mt-4 overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <table class="w-full text-left text-sm" data-testid="disputes-table">
+              <caption class="sr-only">Card disputes, newest first</caption>
+              <thead class="text-xs uppercase tracking-wide text-slate-400">
+                <tr><th class="px-4 py-3 font-medium">Customer</th><th class="px-4 py-3 font-medium">Payment</th><th class="px-4 py-3 text-right font-medium">Amount</th><th class="px-4 py-3 font-medium">State</th></tr>
+              </thead>
+              <tbody>
+                @for (x of d.disputes; track x.id) {
+                  <tr class="border-t border-slate-100 align-top">
+                    <td class="px-4 py-3">{{ x.email }}<span class="block text-xs text-slate-400">{{ x.filedAt | date: 'medium' }}</span></td>
+                    <td class="px-4 py-3"><span class="font-mono">•••• {{ x.last4 }}</span><span class="block text-xs text-slate-500">{{ x.merchantName }} · {{ x.reason }}@if (x.note) { · “{{ x.note }}” }</span></td>
+                    <td class="px-4 py-3 text-right tabular-nums">{{ amountNumber(x.amount) | currency: 'USD' }}</td>
+                    <td class="px-4 py-3">
+                      <span class="rounded-full px-2 py-0.5 text-xs font-semibold"
+                        [class.bg-green-50]="x.status === 'WON'" [class.text-green-700]="x.status === 'WON'"
+                        [class.bg-red-50]="x.status === 'LOST'" [class.text-red-700]="x.status === 'LOST'"
+                        [class.bg-slate-100]="x.status === 'FILED' || x.status === 'OPEN'" [class.text-slate-600]="x.status === 'FILED' || x.status === 'OPEN'">{{ disputeStatusLabel(x.status) }}</span>
+                      @if (x.outcome) { <span class="block text-xs text-slate-500">{{ x.outcome }}</span> }
+                      @if (x.lateRepresentment) { <span class="block text-xs text-amber-700" data-testid="late-note">The shop answered after the dispute was won; the customer was debited again.</span> }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      } @else {
+        <p class="mt-6 text-sm text-slate-500">Loading the disputes…</p>
+      }
+    }
+
     @case ('audit') {
       @if (auditFailed()) {
         <p class="alert-error mt-6" role="alert">

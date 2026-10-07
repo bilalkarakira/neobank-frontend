@@ -3,8 +3,8 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { Account } from '../accounts/accounts.models';
-import { Card, CardAuthorization, IssuedCard } from './cards.models';
-import { Cards, limitValidator } from './cards';
+import { Card, CardAuthorization, Dispute, IssuedCard } from './cards.models';
+import { Cards, disputeAmountValidator, limitValidator } from './cards';
 import { FormControl } from '@angular/forms';
 
 const account = (overrides: Partial<Account> = {}): Account => ({
@@ -56,6 +56,23 @@ const authorization = (overrides: Partial<CardAuthorization> = {}): CardAuthoriz
   ...overrides,
 });
 
+const dispute = (overrides: Partial<Dispute> = {}): Dispute => ({
+  id: 'd1',
+  authorizationId: 'p1',
+  merchantName: 'Corner Cafe',
+  last4: '0012',
+  amount: '57.50',
+  reason: 'UNAUTHORIZED',
+  note: null,
+  status: 'FILED',
+  outcome: null,
+  filedAt: '2026-10-07T10:00:00Z',
+  openedAt: null,
+  closedAt: null,
+  answerDueAt: null,
+  ...overrides,
+});
+
 const NOTHING_OWED = { total: '0.00', items: [] };
 
 const PAN = '9999000000000012';
@@ -79,8 +96,11 @@ describe('Cards page', () => {
 
   // the debt line is a nicety fetched next to the cards: tests that do not care answer it with "nothing owed"
   const settleOwed = () => http.match('/api/cards/owed').forEach((r) => r.flush(NOTHING_OWED));
+  // the same for the list of disputes: tests that do not care answer it with "none"
+  const settleDisputes = () => http.match('/api/cards/disputes').forEach((r) => r.flush([]));
   afterEach(() => {
     settleOwed();
+    settleDisputes();
     http.verify();
   });
 
@@ -491,6 +511,7 @@ describe('Cards page', () => {
     click('Hide activity');
     expect(el.textContent).not.toContain('Nothing is pending');
     settleOwed();
+    settleDisputes();
     http.verify();
   });
 
@@ -500,6 +521,223 @@ describe('Cards page', () => {
     http.expectOne((r) => r.params.get('pending') === 'true').flush('x', { status: 500, statusText: 'x' });
     fixture.detectChanges();
     expect(el.textContent).toContain('Could not load the activity');
+  });
+});
+
+describe('Cards page: disputes', () => {
+  let http: HttpTestingController;
+  let fixture: ComponentFixture<Cards>;
+  let el: HTMLElement;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      imports: [Cards],
+      providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
+    });
+    http = TestBed.inject(HttpTestingController);
+    fixture = TestBed.createComponent(Cards);
+    el = fixture.nativeElement as HTMLElement;
+    fixture.detectChanges();
+  });
+
+  afterEach(() => {
+    http.match('/api/cards/owed').forEach((r) => r.flush(NOTHING_OWED));
+    http.verify();
+  });
+
+  const field = (id: string) => el.querySelector<HTMLInputElement | HTMLSelectElement>('#' + id)!;
+  const set = (id: string, value: string) => {
+    const input = field(id);
+    input.value = value;
+    input.dispatchEvent(new Event(input instanceof HTMLSelectElement ? 'change' : 'input'));
+    fixture.detectChanges();
+  };
+  const text = (testId: string) => el.querySelector(`[data-testid=${testId}]`)?.textContent?.replace(/\s+/g, ' ').trim();
+  const submitForm = () => {
+    el.querySelector<HTMLFormElement>('[data-testid=dispute-form]')!.dispatchEvent(new Event('submit'));
+    fixture.detectChanges();
+  };
+
+  /** The page with one card, the customer's disputes, and the activity of the card open with the given posted payments. */
+  const open = (disputes: Dispute[], posted: CardAuthorization[]) => {
+    http.expectOne('/api/cards').flush([card()]);
+    http.expectOne('/api/accounts').flush([account()]);
+    http.expectOne('/api/cards/disputes').flush(disputes);
+    fixture.detectChanges();
+    [...el.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent?.includes('Show activity'))!.click();
+    fixture.detectChanges();
+    http.expectOne((r) => r.params.get('pending') === 'true').flush({ items: [], page: 0, size: 0, totalElements: 0 });
+    http.expectOne((r) => r.params.get('page') === '0').flush({ items: posted, page: 0, size: 10, totalElements: posted.length });
+    fixture.detectChanges();
+  };
+  const posted = (overrides: Partial<CardAuthorization> = {}) =>
+    authorization({ id: 'p1', amount: '50.00', status: 'CAPTURED', expiresAt: null, capturedAmount: '57.50', capturedAt: '2026-10-06T09:00:00Z', ...overrides });
+
+  it('offers a dispute for a posted payment that has none and hides the offer when one exists', () => {
+    open([dispute({ authorizationId: 'p2' })], [posted(), posted({ id: 'p2', merchantName: 'Gas Station' })]);
+
+    const first = el.querySelector('[data-posted=p1]')!;
+    const second = el.querySelector('[data-posted=p2]')!;
+    expect(first.querySelector('[data-testid=dispute-button]')).not.toBeNull();
+    expect(first.querySelector('[data-testid=dispute-state]')).toBeNull();
+    expect(second.querySelector('[data-testid=dispute-button]')).toBeNull();
+    expect(second.querySelector('[data-testid=dispute-state]')!.textContent).toContain('Sent to the card network, waiting for its answer');
+  });
+
+  it('files a dispute with the reason, the note and the amount, and shows the credit and the new state', () => {
+    open([], [posted()]);
+    el.querySelector<HTMLButtonElement>('[data-testid=dispute-button]')!.click();
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid=dispute-button]')).toBeNull();
+
+    set('dispute-reason', 'NOT_RECEIVED');
+    set('dispute-amount', '40.00');
+    set('dispute-note', '  never arrived  ');
+    submitForm();
+
+    const req = http.expectOne('/api/cards/payments/p1/dispute');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ reason: 'NOT_RECEIVED', note: 'never arrived', amount: '40.00' });
+    req.flush(dispute({ amount: '40.00', reason: 'NOT_RECEIVED' }));
+    http.expectOne('/api/cards').flush([card({ availableBalance: '194.75' })]); // the balance changed
+    fixture.detectChanges();
+
+    expect(el.querySelector('[data-testid=dispute-form]')).toBeNull();
+    expect(el.textContent).toContain('Dispute filed. 40.00 USD was credited to your account for now');
+    expect(el.querySelector('[data-posted=p1] [data-testid=dispute-state]')!.textContent).toContain('Sent to the card network');
+    expect(el.querySelector('[data-testid=disputes]')!.textContent).toContain('$40.00');
+  });
+
+  it('sends an empty amount and note as null: the whole payment, no note', () => {
+    open([], [posted()]);
+    el.querySelector<HTMLButtonElement>('[data-testid=dispute-button]')!.click();
+    fixture.detectChanges();
+    set('dispute-reason', 'OTHER');
+    submitForm();
+
+    const req = http.expectOne('/api/cards/payments/p1/dispute');
+    expect(req.request.body).toEqual({ reason: 'OTHER', note: null, amount: null });
+    req.flush(dispute());
+    http.expectOne('/api/cards').flush([card()]);
+  });
+
+  it('sends nothing without a reason, with a badly written amount, or with more than the payment', () => {
+    open([], [posted()]);
+    el.querySelector<HTMLButtonElement>('[data-testid=dispute-button]')!.click();
+    fixture.detectChanges();
+
+    submitForm();
+    http.expectNone('/api/cards/payments/p1/dispute');
+
+    set('dispute-reason', 'OTHER');
+    for (const bad of ['abc', '-5', '0', '0.00', '1.234']) {
+      set('dispute-amount', bad);
+      submitForm();
+      http.expectNone('/api/cards/payments/p1/dispute');
+    }
+    set('dispute-amount', '57.51');
+    submitForm();
+    http.expectNone('/api/cards/payments/p1/dispute');
+    expect(text('dispute-error')).toContain('at most 57.50');
+
+    set('dispute-amount', '57.50');
+    submitForm();
+    http.expectOne('/api/cards/payments/p1/dispute').flush(dispute({ amount: '57.50' }));
+    http.expectOne('/api/cards').flush([card()]);
+  });
+
+  it('shows the reason the server gives and lets the customer try again', () => {
+    open([], [posted()]);
+    el.querySelector<HTMLButtonElement>('[data-testid=dispute-button]')!.click();
+    fixture.detectChanges();
+    set('dispute-reason', 'OTHER');
+    submitForm();
+    http.expectOne('/api/cards/payments/p1/dispute').flush({ detail: 'This payment is more than 120 days old and can no longer be disputed.', code: 'DISPUTE_NOT_ALLOWED' },
+      { status: 422, statusText: 'x' });
+    fixture.detectChanges();
+
+    expect(text('dispute-error')).toBe('This payment is more than 120 days old and can no longer be disputed.');
+    expect(el.querySelector('[data-testid=dispute-form]')).not.toBeNull();
+
+    submitForm();
+    http.expectOne('/api/cards/payments/p1/dispute').flush('x', { status: 404, statusText: 'x' });
+    fixture.detectChanges();
+    expect(text('dispute-error')).toBe('That payment was not found.');
+
+    submitForm();
+    http.expectOne('/api/cards/payments/p1/dispute').flush('x', { status: 500, statusText: 'x' });
+    fixture.detectChanges();
+    expect(text('dispute-error')).toBe('We could not file the dispute. Please try again.');
+  });
+
+  it('closes the form with Cancel and sends nothing', () => {
+    open([], [posted()]);
+    el.querySelector<HTMLButtonElement>('[data-testid=dispute-button]')!.click();
+    fixture.detectChanges();
+    [...el.querySelectorAll<HTMLButtonElement>('[data-testid=dispute-form] button')].find((b) => b.textContent?.includes('Cancel'))!.click();
+    fixture.detectChanges();
+
+    expect(el.querySelector('[data-testid=dispute-form]')).toBeNull();
+    expect(el.querySelector('[data-testid=dispute-button]')).not.toBeNull();
+  });
+
+  it('lists the disputes with their state in words, the time the shop has left, and how a closed one ended', () => {
+    http.expectOne('/api/cards').flush([card()]);
+    http.expectOne('/api/accounts').flush([account()]);
+    http.expectOne('/api/cards/disputes').flush([
+      dispute({ id: 'd1', status: 'FILED' }),
+      dispute({ id: 'd2', status: 'OPEN', openedAt: '2026-10-07T10:01:00Z', answerDueAt: '2026-10-21T10:01:00Z', merchantName: 'Gas Station' }),
+      dispute({ id: 'd3', status: 'WON', outcome: 'The shop did not answer in time: your credit is final.', merchantName: 'Kiosk' }),
+      dispute({ id: 'd4', status: 'LOST', outcome: 'The shop answered with evidence: signed receipt', merchantName: 'Bakery' }),
+    ]);
+    fixture.detectChanges();
+
+    const rows = [...el.querySelectorAll('[data-dispute]')].map((r) => r.textContent?.replace(/\s+/g, ' ').trim());
+    expect(rows.length).toBe(4);
+    expect(rows[0]).toContain('Sent to the card network, waiting for its answer');
+    expect(rows[1]).toContain('Under review: the shop can still answer until');
+    expect(rows[1]).toContain('Oct 21');
+    expect(rows[2]).toContain('Won: the credit is final');
+    expect(rows[2]).toContain('The shop did not answer in time');
+    expect(rows[3]).toContain('Lost: the credit was taken back');
+    expect(rows[3]).toContain('signed receipt');
+    expect(rows[0]).toContain('I did not make this payment');
+  });
+
+  it('shows no disputes section when there are none', () => {
+    http.expectOne('/api/cards').flush([card()]);
+    http.expectOne('/api/accounts').flush([account()]);
+    http.expectOne('/api/cards/disputes').flush([]);
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid=disputes]')).toBeNull();
+  });
+
+  it('works without the list of disputes when it cannot be loaded', () => {
+    http.expectOne('/api/cards').flush([card()]);
+    http.expectOne('/api/accounts').flush([account()]);
+    http.expectOne('/api/cards/disputes').flush('x', { status: 500, statusText: 'x' });
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid=disputes]')).toBeNull();
+    expect(el.textContent).toContain('Everyday');
+  });
+});
+
+describe('disputeAmountValidator', () => {
+  const check = (value: string) => disputeAmountValidator(new FormControl(value, { nonNullable: true }));
+
+  it('accepts an empty value (the whole payment) and positive amounts with up to two decimals', () => {
+    for (const ok of ['', '  ', '0.01', '1', '57.5', '1234.56']) {
+      expect(check(ok), ok).toBeNull();
+    }
+  });
+
+  it('refuses zero, negatives, three decimals and text', () => {
+    expect(check('0')).toEqual({ range: true });
+    expect(check('0.00')).toEqual({ range: true });
+    expect(check('-1')).toEqual({ format: true });
+    expect(check('1.005')).toEqual({ format: true });
+    expect(check('abc')).toEqual({ format: true });
+    expect(check('12345678901')).toEqual({ format: true });
   });
 });
 

@@ -235,7 +235,7 @@
                         } @else {
                           <ul class="mt-2 divide-y divide-slate-100 rounded-xl border border-slate-200" data-testid="posted">
                             @for (a of posted(state.recent); track a.id) {
-                              <li class="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+                              <li class="flex flex-wrap items-center justify-between gap-3 px-3 py-2 text-sm" [attr.data-posted]="a.id">
                                 <span>
                                   <span class="font-medium">{{ a.merchantName ?? 'Card payment' }}</span>
                                   <span class="block text-xs text-slate-500">{{ a.capturedAt ?? a.createdAt | date: 'medium' }}</span>
@@ -247,6 +247,45 @@
                                   }
                                 </span>
                                 <span class="font-semibold tabular-nums">{{ number(a.capturedAmount ?? a.amount) | currency: 'USD' }}</span>
+                                <div class="basis-full">
+                                  @if (disputeFor(a); as d) {
+                                    <p class="text-xs text-slate-600" data-testid="dispute-state">Disputed: {{ disputeText(d) }}</p>
+                                  } @else if (disputing() !== a.id) {
+                                    <button type="button" class="text-xs font-medium text-brand-700 underline" data-testid="dispute-button" (click)="startDispute(a)">Dispute this payment</button>
+                                  }
+                                  @if (disputing() === a.id) {
+                                    <form [formGroup]="disputeForm" (ngSubmit)="submitDispute(a)" class="mt-2 space-y-3 rounded-xl bg-slate-50 p-3" data-testid="dispute-form" novalidate>
+                                      <p class="text-xs text-slate-600">The bank credits the amount to your account for now and asks the card network to take the money back from the shop. If the shop does not answer in time, the credit is final; if it proves the sale was fine, the money is taken from your account again.</p>
+                                      @if (disputeError(); as message) {
+                                        <p class="alert-error" role="alert" data-testid="dispute-error">{{ message }}</p>
+                                      }
+                                      <div>
+                                        <label class="label" for="dispute-reason">What is wrong?</label>
+                                        <select id="dispute-reason" class="input" formControlName="reason">
+                                          <option value="">Choose a reason</option>
+                                          @for (r of disputeReasons; track r.value) {
+                                            <option [value]="r.value">{{ r.label }}</option>
+                                          }
+                                        </select>
+                                      </div>
+                                      <div>
+                                        <label class="label" for="dispute-amount">Amount (empty = the whole payment)</label>
+                                        <input id="dispute-amount" class="input" formControlName="amount" inputmode="decimal" autocomplete="off" />
+                                        @if (disputeForm.controls.amount.invalid && disputeForm.controls.amount.touched) {
+                                          <p class="mt-1 text-xs text-red-600">Use a positive amount with at most two decimals.</p>
+                                        }
+                                      </div>
+                                      <div>
+                                        <label class="label" for="dispute-note">Note for the bank (optional)</label>
+                                        <input id="dispute-note" class="input" formControlName="note" maxlength="200" autocomplete="off" />
+                                      </div>
+                                      <div class="flex gap-3">
+                                        <button type="submit" class="btn-primary w-auto px-5" [disabled]="disputeBusy() || disputeForm.invalid">{{ disputeBusy() ? 'Sending…' : 'Send dispute' }}</button>
+                                        <button type="button" class="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100" (click)="cancelDispute()">Cancel</button>
+                                      </div>
+                                    </form>
+                                  }
+                                </div>
                               </li>
                             }
                           </ul>
@@ -296,5 +335,24 @@
     </ul>
   } @else {
     <p class="mt-6 text-sm text-slate-500">Loading your cards…</p>
+  }
+
+  @if (disputes().length > 0) {
+    <section class="mt-8" aria-labelledby="disputes-h" data-testid="disputes">
+      <h2 id="disputes-h" class="text-lg font-semibold">Your card disputes</h2>
+      <ul class="mt-3 divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white">
+        @for (d of disputes(); track d.id) {
+          <li class="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm" [attr.data-dispute]="d.id">
+            <span>
+              <span class="font-medium">{{ d.merchantName ?? 'Card payment' }}</span>
+              <span class="block text-xs text-slate-500">{{ reasonLabel(d.reason) }} · filed {{ d.filedAt | date: 'medium' }}</span>
+              <span class="block text-xs text-slate-600" data-testid="dispute-status">{{ disputeText(d) }}@if (d.status === 'OPEN' && d.answerDueAt) { until {{ d.answerDueAt | date: 'medium' }} }</span>
+              @if (d.outcome && (d.status === 'LOST' || d.status === 'WON')) { <span class="block text-xs text-slate-500" data-testid="dispute-outcome">{{ d.outcome }}</span> }
+            </span>
+            <span class="font-semibold tabular-nums">{{ number(d.amount) | currency: 'USD' }}</span>
+          </li>
+        }
+      </ul>
+    </section>
   }
 </div>

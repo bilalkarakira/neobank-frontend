@@ -169,7 +169,48 @@ export interface ClearingFileRow {
   ackWritten: boolean;
 }
 
-export type ClearingResult = 'POSTED' | 'FORCE_POSTED' | 'REFUND_POSTED' | 'DUPLICATE' | 'REJECTED';
+export type ClearingResult =
+  | 'POSTED'
+  | 'FORCE_POSTED'
+  | 'REFUND_POSTED'
+  | 'DUPLICATE'
+  | 'REJECTED'
+  | 'CHARGEBACK_SENT'
+  | 'CHARGEBACK_POSTED'
+  | 'CHARGEBACK_REFUSED'
+  | 'REPRESENTMENT_POSTED';
+
+/** One card dispute as the bank sees it. Only the last four digits of the card are ever sent. */
+export interface AdminDispute {
+  id: string;
+  email: string;
+  merchantName: string | null;
+  last4: string;
+  amount: string;
+  reason: string;
+  note: string | null;
+  status: 'FILED' | 'OPEN' | 'WON' | 'LOST';
+  outcome: string | null;
+  /** A representment that arrived after the dispute was already won. */
+  lateRepresentment: boolean;
+  filedAt: string;
+  openedAt: string | null;
+  closedAt: string | null;
+}
+
+export interface DisputeOverview {
+  /** How long the shop has to answer a chargeback the network accepted. */
+  windowSeconds: number;
+  filed: number;
+  open: number;
+  won: number;
+  lost: number;
+  disputes: AdminDispute[];
+}
+
+export interface CloseDisputesResult {
+  closed: number;
+}
 
 /** How one presentment was decided. Only the last four digits of the card are ever sent. */
 export interface ClearingItemRow {
