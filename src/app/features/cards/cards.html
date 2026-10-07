@@ -220,6 +220,7 @@
                               <li class="flex items-center justify-between gap-3 px-3 py-2 text-sm">
                                 <span>
                                   <span class="font-medium">{{ a.merchantName ?? 'Card payment' }}</span>
+                                  @if (a.cash) { <span class="block text-xs font-medium text-slate-600" data-testid="cash-note">Cash withdrawal</span> }
                                   <span class="block text-xs text-slate-500">{{ a.createdAt | date: 'medium' }}@if (a.expiresAt) { · released automatically {{ a.expiresAt | date: 'mediumDate' }} if not cleared }</span>
                                   @if (a.standIn) { <span class="block text-xs text-brand-700" data-testid="stand-in-note">Approved by the card network while NeoBank was unavailable</span> }
                                 </span>
@@ -238,6 +239,7 @@
                               <li class="flex flex-wrap items-center justify-between gap-3 px-3 py-2 text-sm" [attr.data-posted]="a.id">
                                 <span class="min-w-0 flex-1">
                                   <span class="font-medium">{{ a.merchantName ?? 'Card payment' }}</span>
+                                  @if (a.cash) { <span class="block text-xs font-medium text-slate-600" data-testid="cash-note">Cash withdrawal</span> }
                                   <span class="block text-xs text-slate-500">{{ a.capturedAt ?? a.createdAt | date: 'medium' }}</span>
                                   @if (changed(a)) {
                                     <span class="block text-xs text-slate-500" data-testid="changed-note">Authorized {{ number(a.amount) | currency: 'USD' }}, posted {{ number(a.capturedAmount ?? a.amount) | currency: 'USD' }} (a tip or a change by the shop)</span>
@@ -300,6 +302,7 @@
                               <li class="flex items-center justify-between gap-3 px-3 py-2 text-sm">
                                 <span>
                                   <span class="font-medium">{{ a.merchantName ?? 'Card payment' }}</span>
+                                  @if (a.cash) { <span class="block text-xs font-medium text-slate-600" data-testid="cash-note">Cash withdrawal</span> }
                                   <span class="block text-xs text-slate-500">{{ a.createdAt | date: 'medium' }}</span>
                                   @if (a.reason) { <span class="block text-xs text-red-600">{{ a.reason }}</span> }
                                   @if (a.standIn) { <span class="block text-xs text-brand-700" data-testid="stand-in-note">Approved by the card network while NeoBank was unavailable</span> }

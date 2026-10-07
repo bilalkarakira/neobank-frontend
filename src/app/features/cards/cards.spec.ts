@@ -53,6 +53,7 @@ const authorization = (overrides: Partial<CardAuthorization> = {}): CardAuthoriz
   capturedAmount: null,
   capturedAt: null,
   forced: false,
+  cash: false,
   ...overrides,
 });
 
@@ -453,6 +454,30 @@ describe('Cards page', () => {
     expect(posted.querySelectorAll('[data-testid=forced-note]').length).toBe(1);
     expect(posted.querySelector('[data-testid=forced-note]')!.textContent).toContain('posted anyway');
     expect(el.querySelector('[data-testid=recent]')!.textContent).toContain('Posted');
+  });
+
+  it('marks a cash withdrawal as such in the pending, posted and recent lists, and only that one', () => {
+    loadData();
+    click('Show activity');
+    http.expectOne((r) => r.params.get('pending') === 'true').flush({
+      items: [authorization({ id: 'c1', merchantName: 'City ATM', amount: '100.00', cash: true }), authorization({ id: 's1', merchantName: 'Corner Cafe', amount: '9.00' })],
+      page: 0, size: 2, totalElements: 2,
+    });
+    http.expectOne((r) => r.params.get('page') === '0').flush({
+      items: [
+        authorization({ id: 'c1', merchantName: 'City ATM', amount: '100.00', cash: true }),
+        authorization({ id: 'c2', merchantName: 'City ATM', amount: '50.00', status: 'CAPTURED', expiresAt: null, capturedAmount: '50.00', capturedAt: '2026-10-06T09:00:00Z', cash: true }),
+        authorization({ id: 's2', merchantName: 'Corner Cafe', amount: '20.00', status: 'CAPTURED', expiresAt: null, capturedAmount: '20.00', capturedAt: '2026-10-06T09:05:00Z' }),
+      ],
+      page: 0, size: 10, totalElements: 3,
+    });
+    fixture.detectChanges();
+
+    const notes = (testId: string) => [...el.querySelector(`[data-testid=${testId}]`)!.querySelectorAll('[data-testid=cash-note]')].map((n) => n.textContent?.trim());
+    expect(notes('pending')).toEqual(['Cash withdrawal']);
+    expect(notes('posted')).toEqual(['Cash withdrawal']);
+    expect(notes('recent')).toEqual(['Cash withdrawal', 'Cash withdrawal']);
+    expect(el.querySelector('[data-testid=posted] [data-posted=s2] [data-testid=cash-note]')).toBeNull();
   });
 
   it('tells a customer who owes the bank money, and why card payments fail', () => {

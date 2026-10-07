@@ -53,6 +53,8 @@ export interface CardAuthorization {
   capturedAt: string | null;
   /** Cleared although NeoBank never authorized it: the shop was paid by its bank, so it was posted anyway. */
   forced: boolean;
+  /** A withdrawal at a cash machine (processing code 01), not a payment at a shop. */
+  cash: boolean;
 }
 
 /** What the customer owes the bank because a cleared card payment was more than their account could cover. */
