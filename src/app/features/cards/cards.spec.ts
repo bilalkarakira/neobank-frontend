@@ -3,7 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { Account } from '../accounts/accounts.models';
-import { Card, CardAuthorization, Dispute, IssuedCard } from './cards.models';
+import { Card, CardAuthorization, Dispute, IssuedCard, PendingAuthentication } from './cards.models';
 import { Cards, disputeAmountValidator, limitValidator } from './cards';
 import { FormControl } from '@angular/forms';
 
@@ -78,6 +78,17 @@ const dispute = (overrides: Partial<Dispute> = {}): Dispute => ({
 
 const NOTHING_OWED = { total: '0.00', items: [] };
 
+const waiting = (overrides: Partial<PendingAuthentication> = {}): PendingAuthentication => ({
+  id: 'au1',
+  reference: 'K7M2QX',
+  merchantName: 'Web Shop',
+  amount: '80.00',
+  cardLast4: '0012',
+  createdAt: new Date(Date.now() - 60_000).toISOString(),
+  expiresAt: new Date(Date.now() + 4 * 60_000 + 30_000).toISOString(),
+  ...overrides,
+});
+
 const PAN = '9999000000000012';
 const PIN = '4321';
 const CVV = '731';
@@ -102,9 +113,12 @@ describe('Cards page', () => {
   const settleOwed = () => http.match('/api/cards/owed').forEach((r) => r.flush(NOTHING_OWED));
   // the same for the list of disputes: tests that do not care answer it with "none"
   const settleDisputes = () => http.match('/api/cards/disputes').forEach((r) => r.flush([]));
+  // and for the online payments waiting for approval
+  const settleApprovals = () => http.match('/api/cards/authentications').forEach((r) => r.flush([]));
   afterEach(() => {
     settleOwed();
     settleDisputes();
+    settleApprovals();
     http.verify();
   });
 
@@ -487,6 +501,100 @@ describe('Cards page', () => {
     expect(el.querySelector('[data-testid=posted] [data-posted=s2] [data-testid=cash-note]')).toBeNull();
   });
 
+  describe('online payments waiting for approval', () => {
+    const open = (list: PendingAuthentication[]) => {
+      http.expectOne('/api/cards/authentications').flush(list);
+      loadData();
+    };
+
+    it('shows nothing when no request is waiting', () => {
+      open([]);
+      expect(el.querySelector('[data-testid=approvals]')).toBeNull();
+    });
+
+    it('shows the shop, the amount, the card, the reference and the time left of each waiting request', () => {
+      open([waiting(), waiting({ id: 'au2', reference: 'PLM3ZR', merchantName: 'Book Store', amount: '45.50', expiresAt: new Date(Date.now() + 20_000).toISOString() })]);
+
+      const rows = [...el.querySelectorAll('[data-testid=approval]')];
+      expect(rows.length).toBe(2);
+      expect(rows[0].textContent).toContain('Web Shop');
+      expect(rows[0].querySelector('[data-testid=approval-amount]')!.textContent).toContain('$80.00');
+      expect(rows[0].querySelector('[data-testid=approval-reference]')!.textContent).toBe('K7M2QX');
+      expect(rows[0].textContent).toContain('Card ending 0012');
+      expect(rows[0].querySelector('[data-testid=approval-left]')!.textContent).toBe('5 min left');
+      expect(rows[1].querySelector('[data-testid=approval-left]')!.textContent).toBe('under a minute left');
+      expect(rows[1].querySelector('[data-testid=approval-amount]')!.textContent).toContain('$45.50');
+    });
+
+    it('approves one request, removes it from the list and says what happens next', () => {
+      open([waiting(), waiting({ id: 'au2', reference: 'PLM3ZR', merchantName: 'Book Store' })]);
+
+      el.querySelectorAll<HTMLButtonElement>('[data-testid=approval]')[0].querySelectorAll('button')[0].click();
+      const req = http.expectOne('/api/cards/authentications/au1/approve');
+      expect(req.request.method).toBe('POST');
+      req.flush(null, { status: 204, statusText: 'No Content' });
+      fixture.detectChanges();
+
+      expect(el.querySelectorAll('[data-testid=approval]').length).toBe(1);
+      expect(el.querySelector('[data-testid=approval-reference]')!.textContent).toBe('PLM3ZR');
+      expect(el.querySelector('.alert-success')!.textContent).toContain('You approved the payment to Web Shop');
+    });
+
+    it('rejects a request through its own endpoint', () => {
+      open([waiting()]);
+
+      el.querySelectorAll<HTMLButtonElement>('[data-testid=approval] button')[1].click();
+      const req = http.expectOne('/api/cards/authentications/au1/reject');
+      expect(req.request.method).toBe('POST');
+      req.flush(null, { status: 204, statusText: 'No Content' });
+      fixture.detectChanges();
+
+      expect(el.querySelector('[data-testid=approvals]')).toBeNull();
+      expect(el.querySelector('.alert-success')!.textContent).toContain('You rejected the payment to Web Shop');
+    });
+
+    it('offers no second answer while one is being sent', () => {
+      open([waiting(), waiting({ id: 'au2', reference: 'PLM3ZR' })]);
+
+      const buttons = el.querySelectorAll<HTMLButtonElement>('[data-testid=approval] button');
+      buttons[0].click();
+      fixture.detectChanges();
+      expect([...el.querySelectorAll<HTMLButtonElement>('[data-testid=approval] button')].every((b) => b.disabled)).toBe(true);
+      http.expectOne('/api/cards/authentications/au1/approve').flush(null, { status: 204, statusText: 'No Content' });
+    });
+
+    it('tells the customer when the request expired meanwhile, and reloads the list', () => {
+      open([waiting()]);
+
+      el.querySelectorAll<HTMLButtonElement>('[data-testid=approval] button')[0].click();
+      http.expectOne('/api/cards/authentications/au1/approve').flush({ code: 'CARD_INVALID_STATE', detail: 'x' }, { status: 422, statusText: 'Unprocessable' });
+      fixture.detectChanges();
+
+      expect(text('approval-error')).toContain('expired or was already answered');
+      http.expectOne('/api/cards/authentications').flush([]);
+      fixture.detectChanges();
+      expect(el.querySelector('[data-testid=approval]')).toBeNull();
+    });
+
+    it('shows a generic message when the answer could not be sent', () => {
+      open([waiting()]);
+
+      el.querySelectorAll<HTMLButtonElement>('[data-testid=approval] button')[0].click();
+      http.expectOne('/api/cards/authentications/au1/approve').flush(null, { status: 500, statusText: 'Server Error' });
+      fixture.detectChanges();
+
+      expect(text('approval-error')).toContain('Something went wrong');
+      http.expectOne('/api/cards/authentications').flush([waiting()]);
+      fixture.detectChanges();
+      expect(el.querySelectorAll('[data-testid=approval]').length).toBe(1);
+    });
+
+    it('never shows the number, the PIN or the code of the card', () => {
+      open([waiting()]);
+      expect(el.querySelector('[data-testid=approvals]')!.textContent).not.toContain(PAN);
+    });
+  });
+
   it('marks an online payment as such in the pending, posted and recent lists, and only that one', () => {
     loadData();
     click('Show activity');
@@ -597,6 +705,7 @@ describe('Cards page', () => {
     expect(el.textContent).not.toContain('Nothing is pending');
     settleOwed();
     settleDisputes();
+    settleApprovals();
     http.verify();
   });
 
@@ -627,6 +736,7 @@ describe('Cards page: disputes', () => {
 
   afterEach(() => {
     http.match('/api/cards/owed').forEach((r) => r.flush(NOTHING_OWED));
+    http.match('/api/cards/authentications').forEach((r) => r.flush([]));
     http.verify();
   });
 

@@ -1,4 +1,16 @@
 export type CardStatus = 'ACTIVE' | 'FROZEN' | 'CANCELLED';
+/** An online payment waiting for the customer's approval (a simulation of 3-D Secure; no real card scheme message). */
+export interface PendingAuthentication {
+  id: string;
+  /** Shown by the shop too, so the customer can see that it is the same payment. */
+  reference: string;
+  merchantName: string;
+  amount: string;
+  cardLast4: string;
+  createdAt: string;
+  expiresAt: string;
+}
+
 export type FreezeReason = 'CUSTOMER' | 'PIN_TRIES' | 'ADMIN';
 export type AuthorizationStatus = 'AUTHORIZED' | 'DECLINED' | 'REVERSED' | 'EXPIRED' | 'CAPTURED' | 'MERGED';
 

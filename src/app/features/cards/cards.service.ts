@@ -1,7 +1,7 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import { AuthorizationPage, Card, Dispute, DisputeRequest, IssueCardRequest, IssuedCard, Owed } from './cards.models';
+import { AuthorizationPage, Card, Dispute, DisputeRequest, IssueCardRequest, IssuedCard, Owed, PendingAuthentication } from './cards.models';
 
 @Injectable({ providedIn: 'root' })
 export class CardsService {
@@ -36,6 +36,19 @@ export class CardsService {
   /** What the signed-in customer owes the bank after a cleared card payment that was bigger than their account could cover. */
   owed(): Observable<Owed> {
     return this.http.get<Owed>('/api/cards/owed');
+  }
+
+  /** Online payments waiting for the customer's approval (pending and not expired), newest first. */
+  pendingAuthentications(): Observable<PendingAuthentication[]> {
+    return this.http.get<PendingAuthentication[]>(`${this.base}/authentications`);
+  }
+
+  approveAuthentication(id: string): Observable<void> {
+    return this.http.post<void>(`${this.base}/authentications/${id}/approve`, null);
+  }
+
+  rejectAuthentication(id: string): Observable<void> {
+    return this.http.post<void>(`${this.base}/authentications/${id}/reject`, null);
   }
 
   /** The signed-in customer's disputes, newest first. */

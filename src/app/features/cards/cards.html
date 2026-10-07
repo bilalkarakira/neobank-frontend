@@ -27,6 +27,36 @@
     }
   }
 
+  @if (approvals().length > 0 || approvalError()) {
+    <section class="mt-6 rounded-2xl border-2 border-brand-300 bg-brand-50 p-5" aria-labelledby="approvals-title" data-testid="approvals">
+      <h2 id="approvals-title" class="text-lg font-semibold text-brand-900">Approve an online payment?</h2>
+      <p class="mt-1 text-sm text-slate-700">
+        A shop asked to charge your card. Only approve it if it is you, and the shop and the amount are the ones you expect.
+        The reference is also shown to the shop. If you do nothing, the request expires.
+      </p>
+      @if (approvalError(); as message) {
+        <p class="alert-error mt-3" role="alert" data-testid="approval-error">{{ message }}</p>
+      }
+      <ul class="mt-3 space-y-3">
+        @for (a of approvals(); track a.id) {
+          <li class="rounded-xl bg-white p-4" data-testid="approval">
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <p class="font-semibold" data-testid="approval-shop">{{ a.merchantName }}</p>
+                <p class="text-xs text-slate-500">Card ending {{ a.cardLast4 }} · reference <span class="font-mono" data-testid="approval-reference">{{ a.reference }}</span> · <span data-testid="approval-left">{{ timeLeft(a.expiresAt) }}</span></p>
+              </div>
+              <p class="text-lg font-semibold tabular-nums" data-testid="approval-amount">{{ number(a.amount) | currency: 'USD' }}</p>
+            </div>
+            <div class="mt-3 flex flex-wrap gap-2">
+              <button type="button" class="rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50" [disabled]="answering() !== null" (click)="answer(a, true)">Approve</button>
+              <button type="button" class="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold hover:bg-slate-50 disabled:opacity-50" [disabled]="answering() !== null" (click)="answer(a, false)">Reject</button>
+            </div>
+          </li>
+        }
+      </ul>
+    </section>
+  }
+
   @if (revealed(); as issued) {
     <section class="mt-6 rounded-2xl border-2 border-amber-300 bg-amber-50 p-5" aria-labelledby="reveal-title" data-testid="reveal">
       <h2 id="reveal-title" class="text-lg font-semibold text-amber-900">Your new card</h2>

@@ -7,7 +7,7 @@ import { ApiProblem } from '../../core/auth/auth.models';
 import { accountTitle } from '../accounts/account-title';
 import { Account } from '../accounts/accounts.models';
 import { AccountsService } from '../accounts/accounts.service';
-import { AuthorizationStatus, Card, CardAuthorization, Dispute, DisputeReason, IssuedCard, Owed } from './cards.models';
+import { AuthorizationStatus, Card, CardAuthorization, Dispute, DisputeReason, IssuedCard, Owed, PendingAuthentication } from './cards.models';
 import { CardsService } from './cards.service';
 
 export const MAX_DAILY_LIMIT = 5000;
@@ -97,6 +97,11 @@ export class Cards {
   protected readonly activity = signal<Record<string, ActivityState>>({});
   protected readonly owed = signal<Owed | null>(null);
 
+  /** Online payments that wait for the customer's yes or no. */
+  protected readonly approvals = signal<PendingAuthentication[]>([]);
+  protected readonly answering = signal<string | null>(null);
+  protected readonly approvalError = signal<string | null>(null);
+
   protected readonly disputes = signal<Dispute[]>([]);
   /** The posted payment whose dispute form is open. */
   protected readonly disputing = signal<string | null>(null);
@@ -125,12 +130,55 @@ export class Cards {
     // a nicety next to the cards: if it cannot be loaded the page simply shows no debt line
     this.api.owed().subscribe({ next: (o) => this.owed.set(o), error: () => undefined });
     this.api.disputes().subscribe({ next: (list) => this.disputes.set(list), error: () => undefined });
+    this.loadApprovals();
     this.loadFailed.set(false);
     this.api.list().subscribe({
       next: (list) => this.cards.set(list),
       error: () => this.loadFailed.set(true),
     });
     this.accountsApi.list().subscribe({ next: (list) => this.accounts.set(list), error: () => this.accounts.set([]) });
+  }
+
+  // ---- approving online payments ---------------------------------------------------------------------------
+
+  protected loadApprovals(): void {
+    this.api.pendingAuthentications().subscribe({ next: (list) => this.approvals.set(list), error: () => undefined });
+  }
+
+  /** "4 min left", "under a minute left" or "expired": the server decides, this only tells the person. */
+  protected timeLeft(expiresAt: string): string {
+    const seconds = Math.floor((new Date(expiresAt).getTime() - Date.now()) / 1000);
+    if (seconds <= 0) {
+      return 'expired';
+    }
+    return seconds < 60 ? 'under a minute left' : `${Math.ceil(seconds / 60)} min left`;
+  }
+
+  protected answer(request: PendingAuthentication, approve: boolean): void {
+    if (this.answering()) {
+      return;
+    }
+    this.answering.set(request.id);
+    this.approvalError.set(null);
+    this.notice.set(null);
+    const call = approve ? this.api.approveAuthentication(request.id) : this.api.rejectAuthentication(request.id);
+    call.subscribe({
+      next: () => {
+        this.answering.set(null);
+        this.approvals.update((list) => list.filter((a) => a.id !== request.id));
+        this.notice.set(approve
+          ? `You approved the payment to ${request.merchantName}. The shop can now try again.`
+          : `You rejected the payment to ${request.merchantName}.`);
+      },
+      error: (err: unknown) => {
+        this.answering.set(null);
+        const problem = err instanceof HttpErrorResponse ? (err.error as ApiProblem | null) : null;
+        this.approvalError.set(problem?.code === 'CARD_INVALID_STATE'
+          ? 'This request is no longer waiting for your answer: it expired or was already answered.'
+          : 'Something went wrong. Please try again.');
+        this.loadApprovals();
+      },
+    });
   }
 
   // ---- issuing ----------------------------------------------------------------------------------------------

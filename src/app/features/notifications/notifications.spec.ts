@@ -126,4 +126,17 @@ describe('Notifications page', () => {
     expect(el.textContent).toContain('Card ·');
   });
 
+  it('shows the request to approve an online payment as a card notice', () => {
+    http.expectOne('/api/notifications').flush({
+      unreadCount: 1,
+      items: [item({ id: 'n-10', kind: 'CARD_AUTH_REQUESTED', title: 'Approve an online payment?', body: 'Web Shop asked to charge 80.00 (reference K7M2QX).' })],
+    });
+    fixture.detectChanges();
+
+    expect(el.textContent).toContain('Approve an online payment?');
+    expect(el.textContent).toContain('reference K7M2QX');
+    expect(el.textContent).toContain('Card ·');
+    expect(el.textContent).not.toContain('Password ·');
+  });
+
 });
