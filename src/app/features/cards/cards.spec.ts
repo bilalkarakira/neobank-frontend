@@ -54,6 +54,7 @@ const authorization = (overrides: Partial<CardAuthorization> = {}): CardAuthoriz
   capturedAt: null,
   forced: false,
   cash: false,
+  parentId: null,
   ...overrides,
 });
 
@@ -478,6 +479,34 @@ describe('Cards page', () => {
     expect(notes('posted')).toEqual(['Cash withdrawal']);
     expect(notes('recent')).toEqual(['Cash withdrawal', 'Cash withdrawal']);
     expect(el.querySelector('[data-testid=posted] [data-posted=s2] [data-testid=cash-note]')).toBeNull();
+  });
+
+  it('shows an addition to an earlier payment as such while pending and as merged once the payment cleared', () => {
+    loadData();
+    click('Show activity');
+    http.expectOne((r) => r.params.get('pending') === 'true').flush({
+      items: [authorization({ id: 'p1', merchantName: 'Gas Station', amount: '50.00' }), authorization({ id: 'p2', merchantName: 'Gas Station', amount: '25.00', parentId: 'p1' })],
+      page: 0, size: 2, totalElements: 2,
+    });
+    http.expectOne((r) => r.params.get('page') === '0').flush({
+      items: [
+        authorization({ id: 'p1', merchantName: 'Gas Station', amount: '50.00' }),
+        authorization({ id: 'p2', merchantName: 'Gas Station', amount: '25.00', parentId: 'p1' }),
+        authorization({ id: 'm1', merchantName: 'Gas Station', amount: '10.00', parentId: 'c1', status: 'MERGED', expiresAt: null }),
+        authorization({ id: 'c1', merchantName: 'Gas Station', amount: '40.00', status: 'CAPTURED', expiresAt: null, capturedAmount: '48.20', capturedAt: '2026-10-06T09:00:00Z' }),
+      ],
+      page: 0, size: 10, totalElements: 4,
+    });
+    fixture.detectChanges();
+
+    const notes = (testId: string) => [...el.querySelector(`[data-testid=${testId}]`)!.querySelectorAll('[data-testid=increment-note]')].map((n) => n.textContent?.trim());
+    expect(notes('pending')).toEqual(['Added to an earlier payment']);
+    expect(notes('recent')).toEqual(['Added to an earlier payment', 'Added to an earlier payment']);
+    expect(el.querySelector('[data-testid=recent]')!.textContent).toContain('Added to the main payment');
+    const posted = el.querySelector('[data-testid=posted]')!;
+    expect(posted.querySelectorAll('li').length).toBe(1);
+    expect(posted.textContent).toContain('$48.20');
+    expect(posted.textContent).not.toContain('Added to an earlier payment');
   });
 
   it('tells a customer who owes the bank money, and why card payments fail', () => {

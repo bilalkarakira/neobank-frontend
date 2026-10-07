@@ -1,6 +1,6 @@
 export type CardStatus = 'ACTIVE' | 'FROZEN' | 'CANCELLED';
 export type FreezeReason = 'CUSTOMER' | 'PIN_TRIES' | 'ADMIN';
-export type AuthorizationStatus = 'AUTHORIZED' | 'DECLINED' | 'REVERSED' | 'EXPIRED' | 'CAPTURED';
+export type AuthorizationStatus = 'AUTHORIZED' | 'DECLINED' | 'REVERSED' | 'EXPIRED' | 'CAPTURED' | 'MERGED';
 
 /** A card as the server describes it: masked number only. Money values are decimal strings, never parsed for sums. */
 export interface Card {
@@ -55,6 +55,8 @@ export interface CardAuthorization {
   forced: boolean;
   /** A withdrawal at a cash machine (processing code 01), not a payment at a shop. */
   cash: boolean;
+  /** Set when this is an addition to an earlier payment (a pump that topped up): the first authorization it adds to. */
+  parentId: string | null;
 }
 
 /** What the customer owes the bank because a cleared card payment was more than their account could cover. */

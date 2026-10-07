@@ -128,7 +128,7 @@ export interface CustomerDetail {
   pausedOrders: number;
 }
 
-export type CardAuthStatus = 'AUTHORIZED' | 'DECLINED' | 'REVERSED' | 'EXPIRED' | 'CAPTURED';
+export type CardAuthStatus = 'AUTHORIZED' | 'DECLINED' | 'REVERSED' | 'EXPIRED' | 'CAPTURED' | 'MERGED';
 
 /** One card authorization decision. Only the last four digits of the card are ever sent. */
 export interface CardAuthorizationRow {

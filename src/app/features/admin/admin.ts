@@ -259,7 +259,7 @@ export class Admin {
   }
 
   protected cardStatusLabel(status: CardAuthStatus): string {
-    return { AUTHORIZED: 'Pending hold', DECLINED: 'Declined', REVERSED: 'Reversed', EXPIRED: 'Expired', CAPTURED: 'Posted' }[status];
+    return { AUTHORIZED: 'Pending hold', DECLINED: 'Declined', REVERSED: 'Reversed', EXPIRED: 'Expired', CAPTURED: 'Posted', MERGED: 'Added to a payment' }[status];
   }
 
   // ---- clearing ---------------------------------------------------------------------------------------------

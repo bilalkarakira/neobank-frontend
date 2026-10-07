@@ -57,6 +57,7 @@ const STATUS_LABELS: Record<AuthorizationStatus, string> = {
   REVERSED: 'Cancelled by the shop',
   EXPIRED: 'Expired',
   CAPTURED: 'Posted',
+  MERGED: 'Added to the main payment',
 };
 
 @Component({
