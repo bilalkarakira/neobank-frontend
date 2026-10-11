@@ -1,4 +1,4 @@
-import { Component, DestroyRef, ElementRef, effect, inject, input, viewChild } from '@angular/core';
+import { Component, DestroyRef, ElementRef, InjectionToken, effect, inject, input, viewChild } from '@angular/core';
 import {
   BarController,
   BarElement,
@@ -16,6 +16,18 @@ import {
 // register only what the dashboard uses (keeps the bundle small)
 Chart.register(LineController, LineElement, PointElement, BarController, BarElement, CategoryScale, LinearScale, Filler, Tooltip);
 
+/** Creates a chart on a canvas. The default draws with Chart.js; tests provide a recorder, because the test DOM has no real canvas. */
+export interface ChartHandle {
+  destroy(): void;
+}
+
+export type ChartFactory = (canvas: HTMLCanvasElement, config: ChartConfiguration) => ChartHandle;
+
+export const CHART_FACTORY = new InjectionToken<ChartFactory>('CHART_FACTORY', {
+  providedIn: 'root',
+  factory: () => (canvas, config) => new Chart(canvas, config),
+});
+
 /**
  * The single place that touches Chart.js. It draws a configuration on a canvas, rebuilds when the configuration
  * changes, and destroys the chart with the component. The canvas is an image for assistive technology, so every
@@ -31,13 +43,14 @@ export class ChartCanvas {
   readonly label = input('');
 
   private readonly canvas = viewChild.required<ElementRef<HTMLCanvasElement>>('canvas');
-  private chart: Chart | null = null;
+  private readonly createChart = inject(CHART_FACTORY);
+  private chart: ChartHandle | null = null;
 
   constructor() {
     effect(() => {
       const config = this.config();
       this.chart?.destroy();
-      this.chart = new Chart(this.canvas().nativeElement, config);
+      this.chart = this.createChart(this.canvas().nativeElement, config);
     });
     inject(DestroyRef).onDestroy(() => this.chart?.destroy());
   }

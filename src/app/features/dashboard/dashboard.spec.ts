@@ -3,28 +3,20 @@ import { HttpTestingController, TestRequest, provideHttpClientTesting } from '@a
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
-import { Chart } from 'chart.js';
 import { Account } from '../accounts/accounts.models';
 import { BalancePoint, CashflowMonth, SpendingByCategory, Summary } from './analytics.models';
+import { CHART_FACTORY, ChartFactory } from './chart-canvas';
 import { Dashboard } from './dashboard';
 
-// no real canvas in the test DOM: Chart.js is replaced by a recorder of the charts the page asks for
-vi.mock('chart.js', () => {
-  class FakeChart {
-    static register = vi.fn();
-    static instances: { config: { type: string } }[] = [];
-    destroy = vi.fn();
-    constructor(public canvas: HTMLCanvasElement, public config: { type: string }) {
-      FakeChart.instances.push(this);
-    }
-  }
-  const stub = class {};
-  return {
-    Chart: FakeChart, LineController: stub, LineElement: stub, PointElement: stub, BarController: stub,
-    BarElement: stub, CategoryScale: stub, LinearScale: stub, Filler: stub, Tooltip: stub,
-  };
-});
-const charts = () => (Chart as unknown as { instances: { config: { type: string } }[] }).instances;
+// no real canvas in the test DOM: the page is given a factory that records the charts it asks for
+type Recorded = { canvas: HTMLCanvasElement; config: { type: string }; destroy: () => void };
+const created: Recorded[] = [];
+const recorder: ChartFactory = (canvas, config) => {
+  const chart: Recorded = { canvas, config: config as unknown as { type: string }, destroy: vi.fn() };
+  created.push(chart);
+  return chart;
+};
+const charts = () => created;
 
 const ACCOUNTS: Account[] = [
   { id: 'a', iban: 'XX65NEOB1000000001', type: 'CHECKING', currency: 'USD', status: 'ACTIVE', nickname: 'Daily', balance: '0', availableBalance: '0', heldAmount: '0.00', createdAt: '' },
@@ -63,7 +55,10 @@ describe('Dashboard', () => {
   beforeEach(() => {
     charts().length = 0;
     TestBed.configureTestingModule({
-      providers: [provideRouter([{ path: 'dashboard', component: Dashboard }]), provideHttpClient(), provideHttpClientTesting()],
+      providers: [
+        provideRouter([{ path: 'dashboard', component: Dashboard }]), provideHttpClient(), provideHttpClientTesting(),
+        { provide: CHART_FACTORY, useValue: recorder },
+      ],
     });
     http = TestBed.inject(HttpTestingController);
     router = TestBed.inject(Router);
