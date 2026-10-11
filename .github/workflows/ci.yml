@@ -1,4 +1,5 @@
-# Installs the dependencies exactly as locked, runs every unit test once and makes the production build.
+# build:  installs the dependencies exactly as locked, runs every unit test once and makes the production build.
+# docker: the Dockerfile (nginx with the production build; the demo stack of the backend repository uses it) still builds.
 name: CI
 
 on:
@@ -27,3 +28,12 @@ jobs:
 
       - name: Production build
         run: npx ng build
+
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: The image builds
+        run: docker build -t neobank-frontend .
